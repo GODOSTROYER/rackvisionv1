@@ -1,93 +1,107 @@
 
-### Product scope & delivery approach
-Build a **frontend-only, high-fidelity SaaS admin prototype** with a cohesive Pulseway-style enterprise look, using static/mock data and service stubs only.  
-Because scope is large, implementation will be delivered in **phases** while keeping design/system consistency from day one.
+## Objective
+Add a new **Dashboard → RackVision** top-level feature as a **frontend-only** infrastructure visualization module, integrated into the existing Pulseway-style shell/design system (no app redesign, no backend/API integration).
 
-### Phase 1 — Core app shell + design system
-1. Create the global app shell:
-   - Fixed deep-blue top bar (logo, search, app launcher, notifications, help, settings, avatar, environment label).
-   - Collapsible left sidebar with icon+label navigation and grouped sections.
-   - Main content area with consistent paddings, max widths, and responsive breakpoints.
-2. Establish visual system:
-   - Light background, subtle borders/shadows, rounded cards, neutral text hierarchy, blue accent states.
-   - Standard spacing, card heights, table density, badge styles, form controls, and hover/active states.
-3. Add route structure for all requested pages and wire sidebar navigation with active state + expandable menu groups.
+## Confirmed decisions
+- **Device click flow:** Hybrid (single-click updates inspector; explicit action/double-click navigates to system details).
+- **Global visualization:** **Pseudo-globe** (subtle animated globe-like overview, no heavy 3D engine).
 
-### Phase 2 — Shared reusable UI components
-Build reusable components to ensure consistency across all pages:
-- PageHeader
-- KPIStatCard
-- WidgetCard
-- StatusBadge
-- FilterBar + SearchBar
-- EnterpriseDataTable (sticky header, sort/filter/search UI, row select, bulk actions, pagination)
-- Tabs
-- Modal
-- Drawer / Inspector panel
-- EmptyState
-- Toast actions
-- Dropdown menu
-- DateRangePicker (UI behavior only)
-- ChartWrapper (line/bar/donut)
-- ActivityFeedItem
-- ActionButtonGroup
-- Loading skeleton patterns
+## Implementation plan
 
-### Phase 3 — Mock data + placeholder service layer
-1. Create centralized mock data modules for:
-   - devices, servers, workstations, patches, alerts, workflows, reports, tickets, integrations, threats, tasks, uptime/events.
-2. Create `/services` or `/api` frontend stub layer with functions returning mock data only:
-   - `getDashboardSummary()`, `getAlerts()`, `getPatchStatus()`, `getSystems()`, `getNetworkDevices()`,
-     `getAutomationWorkflows()`, `getReports()`, `getThreats()`, `getIntegrations()`,
-     `saveSettings()`, `exportReport()`, `runWorkflow()`, etc.
-3. Use simulated loading states and placeholder success/error toasts for actions (no real side effects).
+### 1) Navigation + routing integration
+1. Add **RackVision** under Dashboard children in `src/config/navigation.tsx`.
+2. Add routes in `src/App.tsx`:
+   - `/dashboard/rackvision`
+   - `/dashboard/rackvision/region/:regionId`
+   - `/dashboard/rackvision/site/:siteId`
+   - `/dashboard/rackvision/rack/:rackId`
+   - `/systems/:systemId` (frontend-only detail entrypoint, mapped to Systems UI state)
+3. Keep existing sidebar/topbar behavior and styling unchanged.
 
-### Phase 4 — Main dashboard (Lab Environment)
-Implement “Dashboard - View” as the flagship page with:
-- KPI strip + enterprise widget grid:
-  - Active Alerts, Patch Status, Last Alerts, Endpoint Health, Device Status, Automation Activity,
-    Recent Tasks, System Uptime, Top Critical Devices, Patch Compliance, Network Summary, Quick Actions.
-- Polished chart cards with legends, period selectors, and realistic mock values.
-- Latest alerts table + recent system events feed.
-- Balanced, non-cluttered layout with consistent card alignment and sizing.
+### 2) RackVision data model + service stubs
+1. Extend `src/data/mockData.ts` with RackVision entities:
+   - regions, sites/data centers, rooms, rows, racks, devices, summaries, alerts/capacity snapshots.
+2. Add RackVision placeholder APIs in `src/services/api.ts`:
+   - `getInfrastructureSummary()`
+   - `getRegions()`
+   - `getRegionDetails(regionId)`
+   - `getSites(regionId)`
+   - `getSiteDetails(siteId)`
+   - `getRooms(siteId)`
+   - `getRows(roomId)`
+   - `getRacks(rowId)`
+   - `getRackDetails(rackId)`
+   - `getRackDevices(rackId)`
+   - `getDevicePreview(deviceId)`
+   - `navigateToSystemDetails(deviceId)` (mock navigation helper)
+3. Keep async mock latency pattern consistent with current `wait(...)`.
 
-### Phase 5 — Remaining feature pages (UI-only)
-Implement all requested sections with cohesive UX and mock interactions:
+### 3) New reusable RackVision components (aligned to existing enterprise components)
+Create a focused component set under `src/components/rackvision/`:
+- `RackVisionHeader` (title/subtitle, search, selectors, filters, refresh/export actions)
+- `ViewModeSwitcher` (Global/Hierarchy/Rack/Layout + optional Split)
+- `GlobalInfrastructureView` + `RegionMarker` (pseudo-globe + tooltips + region selection)
+- `RegionSummaryCards`
+- `InfrastructureBreadcrumbs`
+- `HierarchyExplorer` (searchable tree/list)
+- `RackGrid` + `RackCard`
+- `RackElevation` + `RackUnit`
+- `DeviceHoverCard` (concise telemetry snapshot)
+- `DetailsInspectorDrawer` (entity-aware right panel)
+- `RackLegend`, `MetricsMiniBar`, `MiniTrendChart`
+- Reuse existing `StatusBadge`, `WidgetCard`, `FilterBar`, `PageHeader`, `Tabs`, `Sheet/Drawer`, `toast`, `Skeleton`.
 
-1. **Dashboard - Manage**: widget library, drag/reorder affordances, saved layouts, visual settings.
-2. **Client Portal**: ticket/support lists, KB area, chat placeholder, end-user device summary.
-3. **Systems**: device table, filters, details drawer with tabs (Overview, Performance, Services, Processes, Storage, Event Logs, Software, Remote Commands).
-4. **Networks**: network devices table, topology-style panel, SNMP panel, inspector side panel.
-5. **Automation**: workflow list/detail, trigger-condition-action builder UI, templates, history, scripts, managed files.
-6. **Reporting**: report list/templates, scheduling modal, preview cards, export UI actions.
-7. **Advanced Reporting**: analytics dashboard, custom builder UI, chart config panel, saved views.
-8. **Integrations**: marketplace grid, connected/disconnected states, config drawer/modal.
-9. **Endpoint Protection**: security dashboard, threat timeline, policies, quarantine, incident panel.
-10. **Patch Management**: compliance, policies, approval queue, history, agent/missing patches, maintenance windows.
-11. **Server Admin**: server groups, admin controls, roles/permissions UI.
-12. **Configuration**: grouped settings sections + placeholder save actions.
-13. **Account**: org profile, billing summary, subscription cards, usage stats, team + role UI.
-14. **Onboarding**: checklist flow, progress tracker, setup steps.
+### 4) RackVision page composition
+Create `src/pages/RackVisionPage.tsx` as a coordinated multi-view command center:
+1. **Header zone** with global controls and filters.
+2. **View modes**:
+   - **Global View**: pseudo-globe + marker hover cards + high-level KPI summary cards.
+   - **Hierarchy View**: breadcrumbs + left tree + center entity cards + right inspector.
+   - **Rack View**: rack grid selector + main rack elevation + hover/device selection + previous/next rack controls.
+   - **Layout View**: room/row/rack spatial topology-style map (clean, low-noise).
+   - Optional **Split View** for hierarchy + rack + inspector together.
+3. **Selection state orchestration** for region → site → room → row → rack → device.
+4. **Loading skeletons** on view/entity transitions; empty states for filtered results.
 
-### Phase 6 — Interaction polish (still frontend-only)
-- Sidebar collapse/expand with smooth transitions and icon-only mode.
-- Parent menu expand/collapse behavior.
-- Modal/drawer/tabs/dropdown interactions.
-- Filter chips, table controls, fake loading transitions.
-- Toast feedback for placeholder actions (“Saved”, “Export started”, “Workflow queued”).
-- Responsive behavior for desktop-first layouts with tablet/mobile adaptations.
+### 5) Rack visualization quality rules
+1. Rack elevation renders:
+   - cabinet frame, U numbering, occupied/empty units, device heights (1U/2U/4U etc.), selected/highlight states.
+2. Device styles:
+   - server/storage/network/security/PDU/blank panel distinctions.
+3. Device interactions:
+   - hover card with required metrics (hostname, IP, OS, CPU/RAM/Disk/temp/network/uptime/status/alerts/power).
+   - single click updates inspector; explicit CTA navigates to `/systems/:systemId`.
+4. Status palette remains existing enterprise tone system (healthy/warning/critical/offline/maintenance).
 
-### Phase 7 — Final quality pass
-- Visual consistency audit across all pages (spacing, typography, states, chart/card language).
-- UX pass for hierarchy and scanability in dense admin screens.
-- Component cleanup and folder organization for maintainability and backend handoff readiness.
-- Ensure every backend-dependent touchpoint is routed through stubs for future integration.
+### 6) Systems page linkage
+1. Update `src/pages/SystemsPage.tsx` to accept route param (`systemId`) and preselect/open matching device summary state.
+2. Preserve existing tabbed details drawer and visual-only telemetry placeholders.
+3. Ensure RackVision “Open Full System Details” routes into this flow.
 
-### Implementation sequencing
-1. Shell + routes + design tokens  
-2. Shared components + table/chart wrappers  
-3. Mock data + service stubs  
-4. Dashboard View + Dashboard Manage  
-5. Systems, Networks, Automation, Reporting  
-6. Remaining pages  
-7. Polish + responsiveness + QA
+### 7) Practical filtering/search behavior (frontend-only)
+1. Add global search over mock fields: hostname, system ID, rack ID, site, IP.
+2. Add filters: region, site, status, device type, occupancy, severity.
+3. Add quick chips/toggles: healthy-only, warning/critical, offline-only, empty slots, network devices, storage devices.
+4. Implement client-side filtering only (no real business logic/backend persistence).
+
+### 8) UX polish and consistency pass
+1. Match existing spacing, card borders, typography, shadows, and blue accent usage.
+2. Add restrained animation only (pseudo-globe rotation, marker pulse, subtle transitions).
+3. Ensure responsive behavior for current desktop-first layout and graceful tablet collapse.
+4. Add mock toasts for refresh/export/quick actions (Open System, Remote Access, Reboot, Maintenance Mode, View Alerts, Run Automation).
+
+## Technical details
+- **Primary files to update:** `src/config/navigation.tsx`, `src/App.tsx`, `src/data/mockData.ts`, `src/services/api.ts`, `src/pages/SystemsPage.tsx`.
+- **Primary files to add:** `src/pages/RackVisionPage.tsx` + new `src/components/rackvision/*`.
+- **State strategy:** local React state in page container + derived filtered collections; no backend state.
+- **Routing strategy:** nested dashboard route for RackVision; direct parameterized system route for deep link.
+- **Performance guardrails:** memoize derived rack/unit maps and filtered lists; keep visual components split and composable.
+
+## Acceptance checklist
+- RackVision appears under Dashboard and routes correctly.
+- All four required views are present and coordinated.
+- Hierarchy flow works: Global/Region → Site/DC → Room/Row → Rack → Device → Systems details.
+- Rack elevation is realistic (U-based) with hover + click behaviors.
+- Inspector updates by selected entity type.
+- All data/actions are mock/frontend-only with service stubs.
+- Visual style remains cohesive with existing Pulseway-style dashboard.
