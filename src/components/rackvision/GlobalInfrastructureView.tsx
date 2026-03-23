@@ -5,15 +5,18 @@ import { GlobalViewSkeleton } from "@/components/rackvision/GlobalViewSkeleton";
 import { InfrastructureGlobe } from "@/components/rackvision/InfrastructureGlobe";
 import { RegionSummaryPanel } from "@/components/rackvision/RegionSummaryPanel";
 import { SelectionHintBanner } from "@/components/rackvision/SelectionHintBanner";
-import { SiteSummaryPanel } from "@/components/rackvision/SiteSummaryPanel";
-import { GlobalSummary, GlobeMarker, RegionSummary, SiteSummary } from "@/components/rackvision/types";
+import { SiteOverviewCanvas } from "@/components/rackvision/SiteOverviewCanvas";
+import { GlobalSummary, GlobeMarker, RackVisionEntityKind, RegionSummary, SiteSummary } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
 
 type GlobalInfrastructureViewProps = {
   loading: boolean;
   summary: GlobalSummary | null;
   markers: GlobeMarker[];
-  selectedEntityKind: string | null;
+  selectedEntityId: string | null;
+  selectedEntityKind: RackVisionEntityKind | null;
+  selectedRegionId: string | null;
+  selectedSiteId: string | null;
   selectedEntityName: string | null;
   selectedMarkerId: string | null;
   hoveredMarkerId: string | null;
@@ -22,6 +25,8 @@ type GlobalInfrastructureViewProps = {
   regionLookup: Record<string, string>;
   onHoverMarker: (id: string | null) => void;
   onSelectMarker: (id: string) => void;
+  onSelectEntity: (id: string) => Promise<void>;
+  onOpenRack: (id: string) => Promise<void>;
   globalViewMode: "regions" | "sites";
   onGlobalViewModeChange: (mode: "regions" | "sites") => void;
 };
@@ -30,18 +35,37 @@ export function GlobalInfrastructureView({
   loading,
   summary,
   markers,
+  selectedEntityId,
   selectedEntityKind,
+  selectedRegionId,
+  selectedSiteId,
   selectedEntityName,
   selectedMarkerId,
   hoveredMarkerId,
   regionSummary,
-  siteSummary,
+  siteSummary: _siteSummary,
   regionLookup,
   onHoverMarker,
   onSelectMarker,
+  onSelectEntity,
+  onOpenRack,
   globalViewMode,
   onGlobalViewModeChange,
 }: GlobalInfrastructureViewProps) {
+  if (selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
+    return (
+      <SiteOverviewCanvas
+        selectedEntityId={selectedEntityId}
+        selectedEntityKind={selectedEntityKind}
+        selectedRegionId={selectedRegionId}
+        selectedSiteId={selectedSiteId}
+        selectedEntityName={selectedEntityName}
+        onSelectEntity={onSelectEntity}
+        onOpenRack={onOpenRack}
+      />
+    );
+  }
+
   if (loading) return <GlobalViewSkeleton />;
   if (!summary || !markers.length) return <GlobalViewEmptyState />;
 
@@ -78,7 +102,6 @@ export function GlobalInfrastructureView({
       />
 
       {selectedEntityKind === "region" && regionSummary ? <RegionSummaryPanel summary={regionSummary} /> : null}
-      {selectedEntityKind === "site" && siteSummary ? <SiteSummaryPanel summary={siteSummary} siteName={selectedEntityName ?? "Site"} /> : null}
     </section>
   );
 }

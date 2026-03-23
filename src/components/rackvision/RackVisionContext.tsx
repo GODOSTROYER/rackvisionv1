@@ -6,11 +6,24 @@ const initialState: RackVisionState = {
   selectedEntityId: null,
   selectedEntityKind: null,
   inspectorEntityId: null,
+  selectedRoomId: null,
+  selectedRowId: null,
+  selectedRackId: null,
+  rackPreviewRackId: null,
   hoveredEntityId: null,
   selectedMarkerId: null,
   globalViewMode: "regions",
   expandedNodeIds: [],
   searchQuery: "",
+  rackSearchQuery: "",
+  rackSortBy: "rack_id",
+  rackFilters: {
+    status: "all",
+    roomId: "all",
+    rowId: "all",
+    occupancy: "all",
+    alertLevel: "all",
+  },
   treeResults: [],
   statusFilter: "all",
   deviceTypeFilter: "all",
@@ -30,6 +43,16 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
         selectedEntityKind: action.payload.kind,
         selectedMarkerId: action.payload.id,
       };
+    case "SET_SELECTED_ROOM":
+      return { ...state, selectedRoomId: action.payload };
+    case "SET_SELECTED_ROW":
+      return { ...state, selectedRowId: action.payload };
+    case "SET_SELECTED_RACK":
+      return { ...state, selectedRackId: action.payload };
+    case "OPEN_RACK_PREVIEW":
+      return { ...state, rackPreviewRackId: action.payload };
+    case "CLOSE_RACK_PREVIEW":
+      return { ...state, rackPreviewRackId: null };
     case "SET_HOVERED_ENTITY":
       return { ...state, hoveredEntityId: action.payload };
     case "SET_SELECTED_MARKER":
@@ -45,6 +68,12 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
     case "SET_SEARCH":
     case "SET_TREE_SEARCH":
       return { ...state, searchQuery: action.payload };
+    case "SET_RACK_SEARCH":
+      return { ...state, rackSearchQuery: action.payload };
+    case "SET_RACK_FILTERS":
+      return { ...state, rackFilters: action.payload };
+    case "SET_RACK_SORT":
+      return { ...state, rackSortBy: action.payload };
     case "TOGGLE_NODE_EXPANDED":
       return {
         ...state,

@@ -59,6 +59,14 @@ function RackVisionWorkspace() {
     dispatch({ type: "SET_BREADCRUMBS", payload: breadcrumbs });
     dispatch({ type: "SET_EXPANDED_NODES", payload: breadcrumbs.slice(1, -1).map((crumb) => crumb.id) });
 
+    const roomCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "room");
+    const rowCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "row");
+    const rackCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "rack");
+    dispatch({ type: "SET_SELECTED_ROOM", payload: roomCrumb?.id ?? null });
+    dispatch({ type: "SET_SELECTED_ROW", payload: rowCrumb?.id ?? null });
+    dispatch({ type: "SET_SELECTED_RACK", payload: rackCrumb?.id ?? null });
+    if (kind !== "rack") dispatch({ type: "CLOSE_RACK_PREVIEW" });
+
     const regionCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "region");
     if (regionCrumb) {
       const regionSites = await MockDataService.getSitesByRegion(regionCrumb.id);
@@ -166,10 +174,20 @@ function RackVisionWorkspace() {
       dispatch({ type: "SET_INSPECTOR_ENTITY", payload: null });
       dispatch({ type: "SET_SELECTED_MARKER", payload: null });
       dispatch({ type: "SET_HOVERED_ENTITY", payload: null });
+      dispatch({ type: "SET_SELECTED_ROOM", payload: null });
+      dispatch({ type: "SET_SELECTED_ROW", payload: null });
+      dispatch({ type: "SET_SELECTED_RACK", payload: null });
+      dispatch({ type: "CLOSE_RACK_PREVIEW" });
       dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
       return;
     }
     await selectEntity(id);
+  };
+
+  const handleOpenRack = async (rackId: string) => {
+    dispatch({ type: "OPEN_RACK_PREVIEW", payload: rackId });
+    await selectEntity(rackId, "rack");
+    navigate(`/dashboard/rackvision/rack/${rackId}`);
   };
 
   return (
@@ -211,7 +229,10 @@ function RackVisionWorkspace() {
             loading={globalLoading}
             summary={globalSummary}
             markers={markers}
+            selectedEntityId={state.selectedEntityId}
             selectedEntityKind={state.selectedEntityKind}
+            selectedRegionId={selectedRegionId}
+            selectedSiteId={selectedSiteId}
             selectedEntityName={selectedEntityName}
             selectedMarkerId={state.selectedMarkerId ?? state.selectedEntityId}
             hoveredMarkerId={state.hoveredEntityId}
@@ -223,6 +244,8 @@ function RackVisionWorkspace() {
               dispatch({ type: "SET_SELECTED_MARKER", payload: id });
               await handleEntitySelect(id);
             }}
+            onSelectEntity={handleEntitySelect}
+            onOpenRack={handleOpenRack}
             globalViewMode={state.globalViewMode}
             onGlobalViewModeChange={(mode) => dispatch({ type: "SET_GLOBAL_VIEW_MODE", payload: mode })}
           />
