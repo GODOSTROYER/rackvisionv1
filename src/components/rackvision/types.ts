@@ -58,10 +58,13 @@ export type Device = BaseRackVisionEntity & {
   rackUnitSize: number;
   deviceType: DeviceType;
   ipAddress: string;
+  osPlatform: string;
   cpuUsage: number;
   memoryUsage: number;
   networkIo: string;
   temperature: number;
+  uptime: string;
+  alertCount: number;
   powerState: "On" | "Standby" | "Off";
 };
 
@@ -78,7 +81,9 @@ export type RackVisionState = {
   selectedEntityId: string | null;
   selectedEntityKind: RackVisionEntityKind | null;
   inspectorEntityId: string | null;
+  expandedNodeIds: string[];
   searchQuery: string;
+  treeResults: string[];
   statusFilter: HealthStatus | "all";
   deviceTypeFilter: DeviceType | "all";
   breadcrumbs: BreadcrumbItem[];
@@ -88,12 +93,23 @@ export type RackVisionState = {
 export type RackVisionAction =
   | { type: "SET_ACTIVE_VIEW"; payload: RackVisionView }
   | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
+  | { type: "SET_SELECTED_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "OPEN_INSPECTOR"; payload: string }
+  | { type: "SET_INSPECTOR_ENTITY"; payload: string | null }
   | { type: "CLOSE_INSPECTOR" }
   | { type: "SET_SEARCH"; payload: string }
+  | { type: "SET_TREE_SEARCH"; payload: string }
+  | { type: "TOGGLE_NODE_EXPANDED"; payload: string }
+  | { type: "SET_EXPANDED_NODES"; payload: string[] }
+  | { type: "SET_TREE_RESULTS"; payload: string[] }
   | { type: "SET_STATUS_FILTER"; payload: HealthStatus | "all" }
   | { type: "SET_DEVICE_TYPE_FILTER"; payload: DeviceType | "all" }
   | { type: "SET_BREADCRUMBS"; payload: BreadcrumbItem[] }
   | { type: "SET_LOADING"; payload: boolean };
+
+export type HierarchyNode = {
+  entity: RackVisionEntity;
+  children: HierarchyNode[];
+};
 
 export type InspectorKind = Extract<RackVisionEntityKind, "region" | "site" | "room" | "row" | "rack" | "device">;

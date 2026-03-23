@@ -6,7 +6,9 @@ const initialState: RackVisionState = {
   selectedEntityId: null,
   selectedEntityKind: null,
   inspectorEntityId: null,
+  expandedNodeIds: [],
   searchQuery: "",
+  treeResults: [],
   statusFilter: "all",
   deviceTypeFilter: "all",
   breadcrumbs: [{ id: "global", label: "Global", kind: "global" }],
@@ -18,6 +20,7 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
     case "SELECT_ENTITY":
+    case "SET_SELECTED_ENTITY":
       return {
         ...state,
         selectedEntityId: action.payload.id,
@@ -25,10 +28,24 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       };
     case "OPEN_INSPECTOR":
       return { ...state, inspectorEntityId: action.payload };
+    case "SET_INSPECTOR_ENTITY":
+      return { ...state, inspectorEntityId: action.payload };
     case "CLOSE_INSPECTOR":
       return { ...state, inspectorEntityId: null };
     case "SET_SEARCH":
+    case "SET_TREE_SEARCH":
       return { ...state, searchQuery: action.payload };
+    case "TOGGLE_NODE_EXPANDED":
+      return {
+        ...state,
+        expandedNodeIds: state.expandedNodeIds.includes(action.payload)
+          ? state.expandedNodeIds.filter((id) => id !== action.payload)
+          : [...state.expandedNodeIds, action.payload],
+      };
+    case "SET_EXPANDED_NODES":
+      return { ...state, expandedNodeIds: action.payload };
+    case "SET_TREE_RESULTS":
+      return { ...state, treeResults: action.payload };
     case "SET_STATUS_FILTER":
       return { ...state, statusFilter: action.payload };
     case "SET_DEVICE_TYPE_FILTER":

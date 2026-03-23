@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { BreadcrumbBarPlaceholder } from "@/components/rackvision/BreadcrumbBarPlaceholder";
-import { CanvasPlaceholder } from "@/components/rackvision/CanvasPlaceholder";
+import { BreadcrumbBar } from "@/components/rackvision/BreadcrumbBar";
 import { FilterBarPlaceholder } from "@/components/rackvision/FilterBarPlaceholder";
-import { HierarchyPanelPlaceholder } from "@/components/rackvision/HierarchyPanelPlaceholder";
-import { InspectorPlaceholder } from "@/components/rackvision/InspectorPlaceholder";
+import { HierarchyPanel } from "@/components/rackvision/HierarchyPanel";
+import { InspectorPanel } from "@/components/rackvision/InspectorPanel";
 import { RackVisionHeader } from "@/components/rackvision/RackVisionHeader";
 import { RackVisionProvider, useRackVision } from "@/components/rackvision/RackVisionContext";
+import { SelectionContextPlaceholder } from "@/components/rackvision/SelectionContextPlaceholder";
 import { ViewModeSwitchPlaceholder } from "@/components/rackvision/ViewModeSwitchPlaceholder";
-import { Region } from "@/components/rackvision/types";
+import { HierarchyNode, RackVisionEntityKind, Region } from "@/components/rackvision/types";
+import { InspectorSummary } from "@/components/rackvision/inspector-types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { MockDataService } from "@/services/rackvision/MockDataService";
@@ -16,58 +17,132 @@ import { MockDataService } from "@/services/rackvision/MockDataService";
 function RackVisionWorkspace() {
   const { state, dispatch } = useRackVision();
   const navigate = useNavigate();
-  const { regionId: regionParam } = useParams();
+  const { regionId: regionParam, siteId: siteParam, rackId: rackParam } = useParams();
 
+  const [tree, setTree] = useState<HierarchyNode[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
+  const [inspectorSummary, setInspectorSummary] = useState<InspectorSummary | null>(null);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
+
+  const selectedRegionId = useMemo(() => {
+    const regionCrumb = [...state.breadcrumbs].reverse().find((crumb) => crumb.kind === "region");
+    return regionCrumb?.id ?? null;
+  }, [state.breadcrumbs]);
+
+  const selectedSiteId = useMemo(() => {
+    const siteCrumb = [...state.breadcrumbs].reverse().find((crumb) => crumb.kind === "site");
+    return siteCrumb?.id ?? null;
+  }, [state.breadcrumbs]);
+
+  const selectEntity = async (id: string | null, kindOverride?: RackVisionEntityKind | null) => {
+    if (!id) return;
+    dispatch({ type: "SET_LOADING", payload: true });
+
+    const entity = await MockDataService.getEntityById(id);
+    const kind = kindOverride ?? entity?.kind ?? null;
+    const breadcrumbs = await MockDataService.getBreadcrumbs(id);
+
+    dispatch({ type: "SET_SELECTED_ENTITY", payload: { id, kind } });
+    dispatch({ type: "SET_INSPECTOR_ENTITY", payload: id });
+    dispatch({ type: "SET_BREADCRUMBS", payload: breadcrumbs });
+    dispatch({ type: "SET_EXPANDED_NODES", payload: breadcrumbs.slice(1, -1).map((crumb) => crumb.id) });
+
+    const regionCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "region");
+    if (regionCrumb) {
+      const regionSites = await MockDataService.getSitesByRegion(regionCrumb.id);
+      setSites(regionSites.map((site) => ({ id: site.id, name: site.name })));
+    }
+
+    dispatch({ type: "SET_LOADING", payload: false });
+  };
 
   useEffect(() => {
     const load = async () => {
       dispatch({ type: "SET_LOADING", payload: true });
-      const loadedRegions = await MockDataService.getRegions();
+      const [loadedRegions, loadedTree] = await Promise.all([MockDataService.getRegions(), MockDataService.getHierarchyTree()]);
       setRegions(loadedRegions);
+      setTree(loadedTree);
 
-      const initialRegionId = regionParam ?? loadedRegions[0]?.id ?? null;
-      if (initialRegionId) {
-        dispatch({ type: "SELECT_ENTITY", payload: { id: initialRegionId, kind: "region" } });
-        const crumbs = await MockDataService.getBreadcrumbs(initialRegionId);
-        dispatch({ type: "SET_BREADCRUMBS", payload: crumbs });
-        const regionSites = await MockDataService.getSitesByRegion(initialRegionId);
-        setSites(regionSites.map((site) => ({ id: site.id, name: site.name })));
-      }
-      dispatch({ type: "SET_LOADING", payload: false });
+      const initialEntityId = rackParam ?? siteParam ?? regionParam ?? loadedRegions[0]?.id ?? null;
+      if (initialEntityId) await selectEntity(initialEntityId);
+      else dispatch({ type: "SET_LOADING", payload: false });
     };
 
     load();
-  }, [dispatch, regionParam]);
+  }, [dispatch, rackParam, regionParam, siteParam]);
 
-  const selectedRegionId = state.selectedEntityKind === "region" ? state.selectedEntityId : null;
-  const selectedSiteId = useMemo(() => sites[0]?.id ?? null, [sites]);
+  useEffect(() => {
+    if (!state.inspectorEntityId) {
+      setInspectorSummary(null);
+      return;
+    }
+
+    const loadInspector = async () => {
+      setInspectorLoading(true);
+      const summary = await MockDataService.getEntitySummary(state.inspectorEntityId as string);
+      setInspectorSummary(summary as InspectorSummary | null);
+      setInspectorLoading(false);
+    };
+
+    loadInspector();
+  }, [state.inspectorEntityId]);
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      dispatch({ type: "SET_TREE_RESULTS", payload: [] });
+      return;
+    }
+
+    const results = await MockDataService.searchHierarchy(query);
+    dispatch({ type: "SET_TREE_RESULTS", payload: results.matchedIds });
+    dispatch({ type: "SET_EXPANDED_NODES", payload: results.expandedIds });
+  };
 
   const handleRegionChange = async (regionId: string) => {
-    dispatch({ type: "SET_LOADING", payload: true });
-    dispatch({ type: "SELECT_ENTITY", payload: { id: regionId, kind: "region" } });
-    const crumbs = await MockDataService.getBreadcrumbs(regionId);
-    dispatch({ type: "SET_BREADCRUMBS", payload: crumbs });
-    const regionSites = await MockDataService.getSitesByRegion(regionId);
-    setSites(regionSites.map((site) => ({ id: site.id, name: site.name })));
-    dispatch({ type: "SET_LOADING", payload: false });
+    await selectEntity(regionId, "region");
     navigate(`/dashboard/rackvision/region/${regionId}`);
+  };
+
+  const handleSiteChange = async (siteId: string) => {
+    await selectEntity(siteId, "site");
+    navigate(`/dashboard/rackvision/site/${siteId}`);
+  };
+
+  const handleEntitySelect = async (entityId: string) => {
+    await selectEntity(entityId);
+  };
+
+  const handleOpenDevice = async (deviceId: string) => {
+    await selectEntity(deviceId, "device");
+    toast({ title: "Open System Details", description: "Navigating to system details placeholder." });
+    navigate(`/systems/${deviceId}`);
+  };
+
+  const handleBreadcrumbSelect = async (id: string) => {
+    if (id === "global") {
+      dispatch({ type: "SET_SELECTED_ENTITY", payload: { id: null, kind: null } });
+      dispatch({ type: "SET_INSPECTOR_ENTITY", payload: null });
+      dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
+      return;
+    }
+    await selectEntity(id);
   };
 
   return (
     <section className="space-y-4">
       <RackVisionHeader
         searchQuery={state.searchQuery}
-        onSearchQueryChange={(value) => dispatch({ type: "SET_SEARCH", payload: value })}
+        onSearchQueryChange={(value) => {
+          dispatch({ type: "SET_TREE_SEARCH", payload: value });
+          handleSearch(value);
+        }}
         regionId={selectedRegionId}
         siteId={selectedSiteId}
         regions={regions}
         sites={sites}
         onRegionChange={handleRegionChange}
-        onSiteChange={() => {
-          toast({ title: "Site selector", description: "Step 1 scaffold only." });
-        }}
+        onSiteChange={handleSiteChange}
         onRefresh={() => {
           toast({ title: "Refreshed", description: "Mock data service re-sync placeholder." });
         }}
@@ -78,7 +153,7 @@ function RackVisionWorkspace() {
 
       <ViewModeSwitchPlaceholder />
       <FilterBarPlaceholder />
-      <BreadcrumbBarPlaceholder />
+      <BreadcrumbBar onSelectBreadcrumb={handleBreadcrumbSelect} />
 
       {state.isLoading ? (
         <div className="grid gap-3 md:grid-cols-3">
@@ -88,9 +163,9 @@ function RackVisionWorkspace() {
         </div>
       ) : (
         <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <HierarchyPanelPlaceholder regions={regions} selectedRegionId={selectedRegionId} onSelectRegion={handleRegionChange} />
-          <CanvasPlaceholder />
-          <InspectorPlaceholder />
+          <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
+          <SelectionContextPlaceholder />
+          <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
         </div>
       )}
     </section>
