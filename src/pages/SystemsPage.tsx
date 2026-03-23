@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +9,17 @@ import { EnterpriseDataTable } from "@/components/enterprise/EnterpriseDataTable
 import { systemsRows } from "@/data/mockData";
 
 export default function SystemsPage() {
-  const [selected, setSelected] = useState(systemsRows[0]);
+  const { systemId } = useParams();
+  const initialSelection = useMemo(
+    () => systemsRows.find((system) => system.id === systemId || system.name === systemId) ?? systemsRows[0],
+    [systemId],
+  );
+  const [selected] = useState(initialSelection);
+  const [open, setOpen] = useState(Boolean(systemId));
+
+  useEffect(() => {
+    if (systemId) setOpen(true);
+  }, [systemId]);
 
   return (
     <section className="space-y-4">
@@ -16,7 +27,7 @@ export default function SystemsPage() {
         title="Systems"
         subtitle="Device inventory with status and details drawer (mock)."
         actions={
-          <Sheet>
+          <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button>Open Device Details</Button>
             </SheetTrigger>
@@ -55,7 +66,7 @@ export default function SystemsPage() {
         rows={systemsRows}
         statusKey="status"
       />
-      <div className="hidden">{setSelected && selected.id}</div>
+      <div className="hidden">{selected.id}</div>
     </section>
   );
 }
