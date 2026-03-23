@@ -4,9 +4,9 @@ import { StatusBadge } from "@/components/enterprise/StatusBadge";
 import { NoRacksState } from "@/components/rackvision/NoRacksState";
 import { RackFilterToolbar } from "@/components/rackvision/RackFilterToolbar";
 import { RackGridPanel } from "@/components/rackvision/RackGridPanel";
-import { RackPreviewPlaceholder } from "@/components/rackvision/RackPreviewPlaceholder";
 import { RackSearchBar } from "@/components/rackvision/RackSearchBar";
 import { RackSortControl } from "@/components/rackvision/RackSortControl";
+import { RackViewCanvas } from "@/components/rackvision/RackViewCanvas";
 import { RegionSitesPanel } from "@/components/rackvision/RegionSitesPanel";
 import { RoomExplorer } from "@/components/rackvision/RoomExplorer";
 import { RowExplorer } from "@/components/rackvision/RowExplorer";
@@ -31,6 +31,7 @@ type SiteOverviewCanvasProps = {
   selectedEntityName: string | null;
   onSelectEntity: (id: string) => Promise<void>;
   onOpenRack: (rackId: string) => Promise<void>;
+  onOpenDevice: (deviceId: string) => Promise<void>;
 };
 
 export function SiteOverviewCanvas({
@@ -41,13 +42,13 @@ export function SiteOverviewCanvas({
   selectedEntityName,
   onSelectEntity,
   onOpenRack,
+  onOpenDevice,
 }: SiteOverviewCanvasProps) {
   const { state, dispatch } = useRackVision();
   const [regionSites, setRegionSites] = useState<SiteCardSummary[]>([]);
   const [overview, setOverview] = useState<SiteOverview | null>(null);
   const [rows, setRows] = useState<RowSummary[]>([]);
   const [racks, setRacks] = useState<RackSummary[]>([]);
-  const [rackPreview, setRackPreview] = useState<RackPreviewData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const regionMode = selectedEntityKind === "region" && selectedEntityId;
@@ -116,17 +117,19 @@ export function SiteOverviewCanvas({
     load();
   }, [siteContextId, state.rackFilters, state.rackSearchQuery, state.rackSortBy, state.selectedRoomId, state.selectedRowId]);
 
-  useEffect(() => {
-    if (!state.rackPreviewRackId) {
-      setRackPreview(null);
-      return;
-    }
-    const load = async () => {
-      const preview = await MockDataService.getRackSummary(state.rackPreviewRackId);
-      setRackPreview(preview as RackPreviewData | null);
-    };
-    load();
-  }, [state.rackPreviewRackId]);
+  const rackViewRackId = state.rackPreviewRackId ?? state.selectedRackId ?? (selectedEntityKind === "rack" ? selectedEntityId : null);
+
+  if (rackViewRackId) {
+    return (
+      <RackViewCanvas
+        rackId={rackViewRackId}
+        siteName={overview?.site.name ?? "Site"}
+        racksInContext={racks}
+        onSelectEntity={onSelectEntity}
+        onOpenDevice={onOpenDevice}
+      />
+    );
+  }
 
   if (loading && !overview && !regionSites.length) return <SiteOverviewSkeleton />;
 
@@ -224,16 +227,6 @@ export function SiteOverviewCanvas({
       ) : (
         <NoRacksState />
       )}
-
-      {rackPreview ? (
-        <RackPreviewPlaceholder rack={rackPreview} siteName={rackPreview.siteName} devices={rackPreview.devices} />
-      ) : null}
-
-      {selectedEntityKind === "rack" && !state.rackPreviewRackId ? (
-        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Rack selected. Use <span className="font-medium text-foreground">Open Rack</span> to launch detailed rack preview mode.
-        </div>
-      ) : null}
 
       {selectedEntityKind === "room" || selectedEntityKind === "row" ? (
         <div className="rounded-md border border-border bg-accent/60 px-3 py-2 text-xs text-accent-foreground">

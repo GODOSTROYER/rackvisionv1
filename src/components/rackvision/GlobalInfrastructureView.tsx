@@ -27,6 +27,7 @@ type GlobalInfrastructureViewProps = {
   onSelectMarker: (id: string) => void;
   onSelectEntity: (id: string) => Promise<void>;
   onOpenRack: (id: string) => Promise<void>;
+  onOpenDevice: (id: string) => Promise<void>;
   globalViewMode: "regions" | "sites";
   onGlobalViewModeChange: (mode: "regions" | "sites") => void;
 };
@@ -49,6 +50,7 @@ export function GlobalInfrastructureView({
   onSelectMarker,
   onSelectEntity,
   onOpenRack,
+  onOpenDevice,
   globalViewMode,
   onGlobalViewModeChange,
 }: GlobalInfrastructureViewProps) {
@@ -62,6 +64,7 @@ export function GlobalInfrastructureView({
         selectedEntityName={selectedEntityName}
         onSelectEntity={onSelectEntity}
         onOpenRack={onOpenRack}
+        onOpenDevice={onOpenDevice}
       />
     );
   }

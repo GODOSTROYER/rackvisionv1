@@ -9,6 +9,9 @@ const initialState: RackVisionState = {
   selectedRoomId: null,
   selectedRowId: null,
   selectedRackId: null,
+  selectedDeviceId: null,
+  hoveredDeviceId: null,
+  activeRackId: null,
   rackPreviewRackId: null,
   hoveredEntityId: null,
   selectedMarkerId: null,
@@ -16,6 +19,7 @@ const initialState: RackVisionState = {
   expandedNodeIds: [],
   searchQuery: "",
   rackSearchQuery: "",
+  rackDeviceSearchQuery: "",
   rackSortBy: "rack_id",
   rackFilters: {
     status: "all",
@@ -24,6 +28,12 @@ const initialState: RackVisionState = {
     occupancy: "all",
     alertLevel: "all",
   },
+  rackDeviceFilter: {
+    type: "all",
+    status: "all",
+  },
+  showEmptyUnits: true,
+  highlightCriticalOnly: false,
   treeResults: [],
   statusFilter: "all",
   deviceTypeFilter: "all",
@@ -49,6 +59,12 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, selectedRowId: action.payload };
     case "SET_SELECTED_RACK":
       return { ...state, selectedRackId: action.payload };
+    case "SET_ACTIVE_RACK":
+      return { ...state, activeRackId: action.payload };
+    case "SET_SELECTED_DEVICE":
+      return { ...state, selectedDeviceId: action.payload };
+    case "SET_HOVERED_DEVICE":
+      return { ...state, hoveredDeviceId: action.payload };
     case "OPEN_RACK_PREVIEW":
       return { ...state, rackPreviewRackId: action.payload };
     case "CLOSE_RACK_PREVIEW":
@@ -70,10 +86,18 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, searchQuery: action.payload };
     case "SET_RACK_SEARCH":
       return { ...state, rackSearchQuery: action.payload };
+    case "SET_RACK_DEVICE_SEARCH":
+      return { ...state, rackDeviceSearchQuery: action.payload };
     case "SET_RACK_FILTERS":
       return { ...state, rackFilters: action.payload };
+    case "SET_RACK_DEVICE_FILTER":
+      return { ...state, rackDeviceFilter: action.payload };
     case "SET_RACK_SORT":
       return { ...state, rackSortBy: action.payload };
+    case "SET_SHOW_EMPTY_UNITS":
+      return { ...state, showEmptyUnits: action.payload };
+    case "SET_HIGHLIGHT_CRITICAL_ONLY":
+      return { ...state, highlightCriticalOnly: action.payload };
     case "TOGGLE_NODE_EXPANDED":
       return {
         ...state,

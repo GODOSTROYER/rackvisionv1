@@ -1,5 +1,5 @@
 export function RackLegend() {
-  const items = ["1U Server", "2U Server", "4U Appliance", "Storage Unit", "Top-of-Rack Switch", "Firewall", "PDU"];
+  const items = ["1U Server", "2U Server", "4U Appliance", "Storage", "ToR Switch", "Firewall", "PDU", "Blank Panel"];
 
   return (
     <div className="rounded-md border border-border bg-card p-3">

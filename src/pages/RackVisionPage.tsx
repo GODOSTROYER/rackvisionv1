@@ -246,6 +246,7 @@ function RackVisionWorkspace() {
             }}
             onSelectEntity={handleEntitySelect}
             onOpenRack={handleOpenRack}
+            onOpenDevice={handleOpenDevice}
             globalViewMode={state.globalViewMode}
             onGlobalViewModeChange={(mode) => dispatch({ type: "SET_GLOBAL_VIEW_MODE", payload: mode })}
           />
