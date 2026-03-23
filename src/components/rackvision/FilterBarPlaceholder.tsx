@@ -9,15 +9,11 @@ export function FilterBarPlaceholder() {
 
   const updateFilters = (next: typeof state.activeFilters) => {
     dispatch({ type: "SET_ACTIVE_FILTERS", payload: next });
-    dispatch({ type: "SET_STATUS_FILTER", payload: next.status });
-    dispatch({ type: "SET_DEVICE_TYPE_FILTER", payload: next.deviceType });
     dispatch({ type: "SET_HIGHLIGHT_CRITICAL_ONLY", payload: next.criticalOnly });
   };
 
   const clearAll = () => {
     dispatch({ type: "CLEAR_ACTIVE_FILTERS" });
-    dispatch({ type: "SET_STATUS_FILTER", payload: "all" });
-    dispatch({ type: "SET_DEVICE_TYPE_FILTER", payload: "all" });
     dispatch({ type: "SET_HIGHLIGHT_CRITICAL_ONLY", payload: false });
   };
 

@@ -35,6 +35,7 @@ export function ActiveFilterChips({ filters, onFiltersChange, onClearAll }: Acti
           key={chip.key}
           type="button"
           className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-foreground transition hover:border-primary"
+          aria-label={`Remove ${chip.label} filter ${String(chip.value)}`}
           onClick={() => {
             const next = { ...filters };
             (next as Record<string, string | boolean>)[chip.key] = typeof chip.value === "boolean" ? false : "all";

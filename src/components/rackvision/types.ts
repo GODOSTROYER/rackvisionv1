@@ -108,8 +108,6 @@ export type RackVisionState = {
   showEmptyUnits: boolean;
   highlightCriticalOnly: boolean;
   treeResults: string[];
-  statusFilter: HealthStatus | "all";
-  deviceTypeFilter: DeviceType | "all";
   breadcrumbs: BreadcrumbItem[];
   globalSearchQuery: string;
   globalSearchResults: RackVisionSearchResult[];
@@ -119,11 +117,6 @@ export type RackVisionState = {
     siteId: string | null;
     roomId: string | null;
   };
-  lastRackVisionContext: {
-    entityId: string | null;
-    view: RackVisionViewMode;
-    rackId: string | null;
-  } | null;
   isLoading: boolean;
 };
 
@@ -165,7 +158,6 @@ export type RackDeviceFilter = {
 
 export type RackVisionAction =
   | { type: "SET_ACTIVE_VIEW"; payload: RackVisionViewMode }
-  | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ROOM"; payload: string | null }
   | { type: "SET_SELECTED_ROW"; payload: string | null }
@@ -178,10 +170,7 @@ export type RackVisionAction =
   | { type: "SET_HOVERED_ENTITY"; payload: string | null }
   | { type: "SET_SELECTED_MARKER"; payload: string | null }
   | { type: "SET_GLOBAL_VIEW_MODE"; payload: "regions" | "sites" }
-  | { type: "OPEN_INSPECTOR"; payload: string }
   | { type: "SET_INSPECTOR_ENTITY"; payload: string | null }
-  | { type: "CLOSE_INSPECTOR" }
-  | { type: "SET_SEARCH"; payload: string }
   | { type: "SET_TREE_SEARCH"; payload: string }
   | { type: "SET_RACK_SEARCH"; payload: string }
   | { type: "SET_RACK_DEVICE_SEARCH"; payload: string }
@@ -193,8 +182,6 @@ export type RackVisionAction =
   | { type: "TOGGLE_NODE_EXPANDED"; payload: string }
   | { type: "SET_EXPANDED_NODES"; payload: string[] }
   | { type: "SET_TREE_RESULTS"; payload: string[] }
-  | { type: "SET_STATUS_FILTER"; payload: HealthStatus | "all" }
-  | { type: "SET_DEVICE_TYPE_FILTER"; payload: DeviceType | "all" }
   | { type: "SET_BREADCRUMBS"; payload: BreadcrumbItem[] }
   | { type: "SET_GLOBAL_SEARCH_QUERY"; payload: string }
   | { type: "SET_GLOBAL_SEARCH_RESULTS"; payload: RackVisionSearchResult[] }
@@ -203,11 +190,31 @@ export type RackVisionAction =
   | { type: "SET_ACTIVE_FILTERS"; payload: RackVisionActiveFilters }
   | { type: "CLEAR_ACTIVE_FILTERS" }
   | { type: "SET_LAYOUT_CONTEXT"; payload: { siteId: string | null; roomId: string | null } }
-  | {
-      type: "SET_LAST_RACKVISION_CONTEXT";
-      payload: { entityId: string | null; view: RackVisionViewMode; rackId: string | null } | null;
-    }
   | { type: "SET_LOADING"; payload: boolean };
+
+export type RackVisionSelectionContext = {
+  entity: RackVisionEntity;
+  breadcrumbs: BreadcrumbItem[];
+  regionId: string | null;
+  siteId: string | null;
+  roomId: string | null;
+  rowId: string | null;
+  rackId: string | null;
+  deviceId: string | null;
+};
+
+export const DEFAULT_ACTIVE_FILTERS: RackVisionActiveFilters = {
+  status: "all",
+  deviceType: "all",
+  criticalOnly: false,
+  offlineOnly: false,
+  regionId: "all",
+  siteId: "all",
+  roomId: "all",
+  rowId: "all",
+  alertSeverity: "all",
+  occupancyRange: "all",
+};
 
 export type HierarchyNode = {
   entity: RackVisionEntity;

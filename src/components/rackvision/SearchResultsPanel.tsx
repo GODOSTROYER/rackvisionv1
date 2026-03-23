@@ -21,7 +21,7 @@ export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPa
   }, {});
 
   return (
-    <div className="max-h-[340px] overflow-auto rounded-lg border border-border bg-card p-2 shadow-sm">
+    <div id="rackvision-search-results" className="max-h-[340px] overflow-auto rounded-lg border border-border bg-card p-2 shadow-sm" role="listbox" aria-label="RackVision search results">
       <div className="space-y-2">
         {Object.entries(groups).map(([group, groupItems]) => (
           <div key={group}>
@@ -32,9 +32,11 @@ export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPa
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item)}
+                  role="option"
+                  aria-label={`${item.name}, ${item.subtitle}`}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition",
-                    "hover:border-border hover:bg-muted/30",
+                    "hover:border-border hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                   )}
                 >
                   <EntityIcon kind={item.kind} className="h-3.5 w-3.5 text-muted-foreground" />

@@ -42,7 +42,7 @@ export function HierarchyTreeNode({
         : `${node.children.length} child ${node.children.length === 1 ? "node" : "nodes"}`;
 
   return (
-    <div>
+    <div role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined} aria-selected={isSelected}>
       <div
         className={cn(
           "group flex items-center gap-1 rounded-md border px-1.5 py-1.5 transition-colors",
@@ -52,16 +52,20 @@ export function HierarchyTreeNode({
         <button
           type="button"
           onClick={() => hasChildren && onToggleExpanded(node.entity.id)}
-          className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground hover:bg-muted"
+          className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          aria-label={hasChildren ? `${isExpanded ? "Collapse" : "Expand"} ${node.entity.name}` : `${node.entity.name} has no child nodes`}
+          aria-hidden={hasChildren ? undefined : true}
+          tabIndex={hasChildren ? 0 : -1}
         >
           {hasChildren ? <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-90")} /> : null}
         </button>
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
           style={{ paddingLeft: `${depth * 8}px` }}
           onClick={() => onSelectNode(node)}
           onDoubleClick={() => onOpenNode(node)}
+          aria-label={`${node.entity.name}, ${node.entity.kind}`}
         >
           <StatusDot status={node.entity.healthStatus} />
           <EntityIcon kind={node.entity.kind} className="h-3.5 w-3.5 text-muted-foreground" />
@@ -71,7 +75,7 @@ export function HierarchyTreeNode({
       </div>
       <p className="truncate pl-9 text-[11px] text-muted-foreground">{secondaryMeta}</p>
       {hasChildren && isExpanded ? (
-        <div className="mt-1 space-y-0.5 border-l border-border/70 pl-2">{node.children.map((child) => (
+        <div className="mt-1 space-y-0.5 border-l border-border/70 pl-2" role="group">{node.children.map((child) => (
           <HierarchyTreeNode
             key={child.entity.id}
             node={child}

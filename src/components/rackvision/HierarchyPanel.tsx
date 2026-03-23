@@ -32,7 +32,7 @@ export function HierarchyPanel({ nodes, onSearch, onSelectEntity, onOpenDevice }
         }}
       />
 
-      <ScrollArea className="h-[520px] pr-2">
+      <ScrollArea className="h-[520px] pr-2" aria-label="RackVision hierarchy tree">
         <HierarchyTree
           nodes={nodes}
           selectedEntityId={state.selectedEntityId}

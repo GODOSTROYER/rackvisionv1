@@ -19,6 +19,7 @@ import {
   RackVisionEntityKind,
   RackVisionSearchResult,
   RackVisionViewMode,
+  RackVisionSelectionContext,
   Region,
   RegionSummary,
   SiteSummary,
@@ -34,6 +35,7 @@ function RackVisionWorkspace() {
 
   const [tree, setTree] = useState<HierarchyNode[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [allSites, setAllSites] = useState<{ id: string; name: string }[]>([]);
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
   const [inspectorSummary, setInspectorSummary] = useState<InspectorSummary | null>(null);
   const [inspectorLoading, setInspectorLoading] = useState(false);
@@ -60,39 +62,55 @@ function RackVisionWorkspace() {
 
   const regionLookup = useMemo(() => Object.fromEntries(regions.map((region) => [region.id, region.name])), [regions]);
 
-  const selectEntity = async (id: string | null, kindOverride?: RackVisionEntityKind | null) => {
-    if (!id) return;
+  const routeEntityId = rackParam ?? siteParam ?? regionParam ?? null;
+
+  const setSiteOptionsForContext = async (context: RackVisionSelectionContext, fallbackSites = allSites) => {
+    if (context.regionId) {
+      const regionSites = await MockDataService.getSitesByRegion(context.regionId);
+      setSites(regionSites.map((site) => ({ id: site.id, name: site.name })));
+      return;
+    }
+    setSites(fallbackSites);
+  };
+
+  const getRouteForSelection = (context: RackVisionSelectionContext, kind: RackVisionEntityKind | null) => {
+    if (kind === "region" && context.regionId) return `/dashboard/rackvision/region/${context.regionId}`;
+    if ((kind === "site" || kind === "room" || kind === "row") && context.siteId) return `/dashboard/rackvision/site/${context.siteId}`;
+    if ((kind === "rack" || kind === "device") && context.rackId) return `/dashboard/rackvision/rack/${context.rackId}`;
+    return "/dashboard/rackvision";
+  };
+
+  const selectEntity = async (
+    id: string | null,
+    options?: { kindOverride?: RackVisionEntityKind | null; updateRoute?: boolean; nextView?: RackVisionViewMode; fallbackSites?: { id: string; name: string }[] },
+  ) => {
+    if (!id) return null;
     dispatch({ type: "SET_LOADING", payload: true });
-    const entity = await MockDataService.getEntityById(id);
-    const kind = kindOverride ?? entity?.kind ?? null;
-    const breadcrumbs = await MockDataService.getBreadcrumbs(id);
+    const context = await MockDataService.getEntityContext(id);
+    if (!context) {
+      dispatch({ type: "SET_LOADING", payload: false });
+      return null;
+    }
+
+    const kind = options?.kindOverride ?? context.entity.kind;
     dispatch({ type: "SET_SELECTED_ENTITY", payload: { id, kind } });
     dispatch({ type: "SET_INSPECTOR_ENTITY", payload: id });
     dispatch({ type: "SET_SELECTED_MARKER", payload: id });
-    dispatch({ type: "SET_BREADCRUMBS", payload: breadcrumbs });
-    dispatch({ type: "SET_EXPANDED_NODES", payload: breadcrumbs.slice(1, -1).map((crumb) => crumb.id) });
+    dispatch({ type: "SET_BREADCRUMBS", payload: context.breadcrumbs });
+    dispatch({ type: "SET_EXPANDED_NODES", payload: context.breadcrumbs.slice(1, -1).map((crumb) => crumb.id) });
+    dispatch({ type: "SET_SELECTED_ROOM", payload: context.roomId });
+    dispatch({ type: "SET_SELECTED_ROW", payload: context.rowId });
+    dispatch({ type: "SET_SELECTED_RACK", payload: context.rackId });
+    dispatch({ type: "SET_SELECTED_DEVICE", payload: context.deviceId });
+    dispatch({ type: "SET_ACTIVE_RACK", payload: context.rackId });
+    dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: context.siteId, roomId: context.roomId } });
+    if (options?.nextView) dispatch({ type: "SET_ACTIVE_VIEW", payload: options.nextView });
+    if (kind !== "rack" && kind !== "device") dispatch({ type: "CLOSE_RACK_PREVIEW" });
 
-    const roomCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "room");
-    const rowCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "row");
-    const rackCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "rack");
-    const deviceCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "device");
-    dispatch({ type: "SET_SELECTED_ROOM", payload: roomCrumb?.id ?? null });
-    dispatch({ type: "SET_SELECTED_ROW", payload: rowCrumb?.id ?? null });
-    dispatch({ type: "SET_SELECTED_RACK", payload: rackCrumb?.id ?? null });
-    dispatch({ type: "SET_SELECTED_DEVICE", payload: deviceCrumb?.id ?? null });
-    dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: breadcrumbs.find((crumb) => crumb.kind === "site")?.id ?? null, roomId: roomCrumb?.id ?? null } });
-    dispatch({
-      type: "SET_LAST_RACKVISION_CONTEXT",
-      payload: { entityId: id, view: state.activeView, rackId: rackCrumb?.id ?? null },
-    });
-    if (kind !== "rack") dispatch({ type: "CLOSE_RACK_PREVIEW" });
-
-    const regionCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "region");
-    if (regionCrumb) {
-      const regionSites = await MockDataService.getSitesByRegion(regionCrumb.id);
-      setSites(regionSites.map((site) => ({ id: site.id, name: site.name })));
-    }
+    await setSiteOptionsForContext(context, options?.fallbackSites);
+    if (options?.updateRoute !== false) navigate(getRouteForSelection(context, kind));
     dispatch({ type: "SET_LOADING", payload: false });
+    return context;
   };
 
   useEffect(() => {
@@ -107,14 +125,23 @@ function RackVisionWorkspace() {
       setRegions(loadedRegions);
       setTree(loadedTree);
       setGlobalSummary(summary);
-      setSites(allSites.map((site) => ({ id: site.id, name: site.name })));
+      const siteOptions = allSites.map((site) => ({ id: site.id, name: site.name }));
+      setAllSites(siteOptions);
+      setSites(siteOptions);
 
-      const initialEntityId = rackParam ?? siteParam ?? regionParam ?? null;
-      if (initialEntityId) await selectEntity(initialEntityId);
-      else dispatch({ type: "SET_LOADING", payload: false });
+      if (routeEntityId) {
+        await selectEntity(routeEntityId, {
+          updateRoute: false,
+          nextView: rackParam ? "rack" : siteParam ? "site" : "global",
+          fallbackSites: siteOptions,
+        });
+      } else {
+        dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
+        dispatch({ type: "SET_LOADING", payload: false });
+      }
     };
     load();
-  }, [dispatch, rackParam, regionParam, siteParam]);
+  }, [dispatch, rackParam, regionParam, routeEntityId, siteParam]);
 
   useEffect(() => {
     const loadGlobal = async () => {
@@ -192,50 +219,49 @@ function RackVisionWorkspace() {
   };
 
   const handleRegionChange = async (regionId: string) => {
-    await selectEntity(regionId, "region");
-    navigate(`/dashboard/rackvision/region/${regionId}`);
+    await selectEntity(regionId, { kindOverride: "region", nextView: "global" });
   };
 
   const handleSiteChange = async (siteId: string) => {
-    await selectEntity(siteId, "site");
-    navigate(`/dashboard/rackvision/site/${siteId}`);
+    await selectEntity(siteId, { kindOverride: "site", nextView: "site" });
   };
 
   const handleEntitySelect = async (entityId: string) => {
-    await selectEntity(entityId);
+    const entity = await MockDataService.getEntityById(entityId);
+    const nextView =
+      entity?.kind === "rack" || entity?.kind === "device"
+        ? "rack"
+        : entity?.kind === "site" || entity?.kind === "room" || entity?.kind === "row"
+          ? "site"
+          : "global";
+    await selectEntity(entityId, { nextView });
   };
 
   const handleSearchResultSelect = async (result: RackVisionSearchResult) => {
-    await selectEntity(result.id, result.kind);
+    const nextView =
+      result.kind === "rack" || result.kind === "device"
+        ? "rack"
+        : result.kind === "site" || result.kind === "room" || result.kind === "row"
+          ? "site"
+          : "global";
+    await selectEntity(result.id, { kindOverride: result.kind, nextView });
     dispatch({ type: "CLOSE_SEARCH_RESULTS" });
     dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: result.name });
-    if (result.kind === "region") dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
-    if (result.kind === "site" || result.kind === "room" || result.kind === "row") dispatch({ type: "SET_ACTIVE_VIEW", payload: "site" });
     if (result.kind === "rack") {
-      dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
       dispatch({ type: "OPEN_RACK_PREVIEW", payload: result.id });
     }
     if (result.kind === "device") {
       const context = await MockDataService.getEntityContext(result.id);
       const rackId = context?.rackId;
       if (rackId) dispatch({ type: "OPEN_RACK_PREVIEW", payload: rackId });
-      dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
     }
   };
 
   const handleOpenDevice = async (deviceId: string) => {
-    await selectEntity(deviceId, "device");
-    dispatch({
-      type: "SET_LAST_RACKVISION_CONTEXT",
-      payload: {
-        entityId: state.selectedEntityId,
-        view: state.activeView,
-        rackId: state.selectedRackId,
-      },
-    });
+    const context = await selectEntity(deviceId, { kindOverride: "device", nextView: "rack" });
     toast({ title: "Open System Details", description: "Navigating to system details placeholder." });
-    const backRoute = state.selectedRackId ? `/dashboard/rackvision/rack/${state.selectedRackId}` : "/dashboard/rackvision";
-    navigate(`/systems/${deviceId}?back=${encodeURIComponent(backRoute)}&entityId=${state.selectedEntityId ?? ""}`);
+    const backRoute = context?.rackId ? `/dashboard/rackvision/rack/${context.rackId}` : "/dashboard/rackvision";
+    navigate(`/systems/${deviceId}?back=${encodeURIComponent(backRoute)}&entityId=${context?.entity.id ?? ""}`);
   };
 
   const handleBreadcrumbSelect = async (id: string) => {
@@ -248,18 +274,28 @@ function RackVisionWorkspace() {
       dispatch({ type: "SET_SELECTED_ROW", payload: null });
       dispatch({ type: "SET_SELECTED_RACK", payload: null });
       dispatch({ type: "SET_SELECTED_DEVICE", payload: null });
+      dispatch({ type: "SET_ACTIVE_RACK", payload: null });
+      dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: null, roomId: null } });
+      dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
       dispatch({ type: "CLOSE_RACK_PREVIEW" });
       dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
+      setSites(allSites);
+      navigate("/dashboard/rackvision");
       return;
     }
-    await selectEntity(id);
+    const crumb = state.breadcrumbs.find((item) => item.id === id);
+    const nextView =
+      crumb?.kind === "rack" || crumb?.kind === "device"
+        ? "rack"
+        : crumb?.kind === "site" || crumb?.kind === "room" || crumb?.kind === "row"
+          ? "site"
+          : "global";
+    await selectEntity(id, { kindOverride: crumb?.kind ?? null, nextView });
   };
 
   const handleOpenRack = async (rackId: string) => {
     dispatch({ type: "OPEN_RACK_PREVIEW", payload: rackId });
-    dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
-    await selectEntity(rackId, "rack");
-    navigate(`/dashboard/rackvision/rack/${rackId}`);
+    await selectEntity(rackId, { kindOverride: "rack", nextView: "rack" });
   };
 
   const renderCenter = () => {

@@ -1,5 +1,5 @@
 import { createContext, Dispatch, ReactNode, useContext, useReducer } from "react";
-import { RackVisionAction, RackVisionState } from "@/components/rackvision/types";
+import { DEFAULT_ACTIVE_FILTERS, RackVisionAction, RackVisionState } from "@/components/rackvision/types";
 
 const initialState: RackVisionState = {
   activeView: "global",
@@ -35,29 +35,15 @@ const initialState: RackVisionState = {
   showEmptyUnits: true,
   highlightCriticalOnly: false,
   treeResults: [],
-  statusFilter: "all",
-  deviceTypeFilter: "all",
   breadcrumbs: [{ id: "global", label: "Global", kind: "global" }],
   globalSearchQuery: "",
   globalSearchResults: [],
   isSearchResultsOpen: false,
-  activeFilters: {
-    status: "all",
-    deviceType: "all",
-    criticalOnly: false,
-    offlineOnly: false,
-    regionId: "all",
-    siteId: "all",
-    roomId: "all",
-    rowId: "all",
-    alertSeverity: "all",
-    occupancyRange: "all",
-  },
+  activeFilters: DEFAULT_ACTIVE_FILTERS,
   layoutContext: {
     siteId: null,
     roomId: null,
   },
-  lastRackVisionContext: null,
   isLoading: false,
 };
 
@@ -65,7 +51,6 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
   switch (action.type) {
     case "SET_ACTIVE_VIEW":
       return { ...state, activeView: action.payload };
-    case "SELECT_ENTITY":
     case "SET_SELECTED_ENTITY":
       return {
         ...state,
@@ -95,13 +80,8 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, selectedMarkerId: action.payload };
     case "SET_GLOBAL_VIEW_MODE":
       return { ...state, globalViewMode: action.payload };
-    case "OPEN_INSPECTOR":
-      return { ...state, inspectorEntityId: action.payload };
     case "SET_INSPECTOR_ENTITY":
       return { ...state, inspectorEntityId: action.payload };
-    case "CLOSE_INSPECTOR":
-      return { ...state, inspectorEntityId: null };
-    case "SET_SEARCH":
     case "SET_TREE_SEARCH":
       return { ...state, searchQuery: action.payload };
     case "SET_RACK_SEARCH":
@@ -129,10 +109,6 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, expandedNodeIds: action.payload };
     case "SET_TREE_RESULTS":
       return { ...state, treeResults: action.payload };
-    case "SET_STATUS_FILTER":
-      return { ...state, statusFilter: action.payload };
-    case "SET_DEVICE_TYPE_FILTER":
-      return { ...state, deviceTypeFilter: action.payload };
     case "SET_BREADCRUMBS":
       return { ...state, breadcrumbs: action.payload };
     case "SET_GLOBAL_SEARCH_QUERY":
@@ -148,23 +124,10 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
     case "CLEAR_ACTIVE_FILTERS":
       return {
         ...state,
-        activeFilters: {
-          status: "all",
-          deviceType: "all",
-          criticalOnly: false,
-          offlineOnly: false,
-          regionId: "all",
-          siteId: "all",
-          roomId: "all",
-          rowId: "all",
-          alertSeverity: "all",
-          occupancyRange: "all",
-        },
+        activeFilters: DEFAULT_ACTIVE_FILTERS,
       };
     case "SET_LAYOUT_CONTEXT":
       return { ...state, layoutContext: action.payload };
-    case "SET_LAST_RACKVISION_CONTEXT":
-      return { ...state, lastRackVisionContext: action.payload };
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
     default:

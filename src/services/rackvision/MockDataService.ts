@@ -22,6 +22,7 @@ import {
   RackViewModel,
   RackVisionEntity,
   RackVisionEntityKind,
+  RackVisionSelectionContext,
   Region,
   RegionSummary,
   RoomSummary,
@@ -420,6 +421,10 @@ function parentOf(entityId: string) {
   return entity?.parentId ? allEntities.find((item) => item.id === entity.parentId) : undefined;
 }
 
+function getEntityByIdSync(entityId: string) {
+  return allEntities.find((entity) => entity.id === entityId);
+}
+
 function descendantsOf(entityId: string) {
   const target = allEntities.find((entity) => entity.id === entityId);
   if (!target) return [] as RackVisionEntity[];
@@ -467,6 +472,20 @@ function collectAncestorIds(entityId: string) {
     current = current.parentId ? allEntities.find((item) => item.id === current?.parentId) : undefined;
   }
   return ids;
+}
+
+function buildEntityChain(entity: RackVisionEntity) {
+  const chain: RackVisionEntity[] = [];
+  let current: RackVisionEntity | undefined = entity;
+  while (current) {
+    chain.push(current);
+    current = current.parentId ? getEntityByIdSync(current.parentId) : undefined;
+  }
+  return chain.reverse();
+}
+
+function getEntityIdInChain(chain: RackVisionEntity[], kind: RackVisionEntityKind) {
+  return chain.find((item) => item.kind === kind)?.id ?? null;
 }
 
 function buildTree(parentId: string | null = null): HierarchyNode[] {
@@ -1104,28 +1123,21 @@ function getLayoutViewModelSync(scopeId: string): LayoutViewModel | null {
   };
 }
 
-function getEntityContextSync(entityId: string) {
-  const entity = allEntities.find((item) => item.id === entityId);
+function getEntityContextSync(entityId: string): RackVisionSelectionContext | null {
+  const entity = getEntityByIdSync(entityId);
   if (!entity) return null;
+  const chain = buildEntityChain(entity);
   const breadcrumbs: BreadcrumbItem[] = [{ id: "global", label: "Global", kind: "global" }];
-  const chain: RackVisionEntity[] = [];
-  let current: RackVisionEntity | undefined = entity;
-  while (current) {
-    chain.push(current);
-    current = current.parentId ? allEntities.find((item) => item.id === current?.parentId) : undefined;
-  }
-  chain.reverse().forEach((item) => breadcrumbs.push({ id: item.id, label: item.name, kind: item.kind }));
-  const siteId = getSiteIdForEntity(entity);
-  const roomId = chain.find((item) => item.kind === "room")?.id ?? null;
-  const rowId = chain.find((item) => item.kind === "row")?.id ?? null;
-  const rackId = chain.find((item) => item.kind === "rack")?.id ?? null;
+  chain.forEach((item) => breadcrumbs.push({ id: item.id, label: item.name, kind: item.kind }));
   return {
     entity,
     breadcrumbs,
-    siteId,
-    roomId,
-    rowId,
-    rackId,
+    regionId: getEntityIdInChain(chain, "region"),
+    siteId: getSiteIdForEntity(entity),
+    roomId: getEntityIdInChain(chain, "room"),
+    rowId: getEntityIdInChain(chain, "row"),
+    rackId: getEntityIdInChain(chain, "rack"),
+    deviceId: getEntityIdInChain(chain, "device"),
   };
 }
 
@@ -1225,19 +1237,11 @@ export const MockDataService = {
   },
   async getEntityById(id: string) {
     await wait();
-    return allEntities.find((entity) => entity.id === id);
+    return getEntityByIdSync(id);
   },
   async getBreadcrumbs(entityId: string) {
     await wait();
-    const breadcrumbs: BreadcrumbItem[] = [{ id: "global", label: "Global", kind: "global" }];
-    let current = allEntities.find((entity) => entity.id === entityId);
-    const chain: RackVisionEntity[] = [];
-    while (current) {
-      chain.push(current);
-      current = current.parentId ? allEntities.find((entity) => entity.id === current?.parentId) : undefined;
-    }
-    chain.reverse().forEach((entity) => breadcrumbs.push({ id: entity.id, label: entity.name, kind: entity.kind }));
-    return breadcrumbs;
+    return getEntityContextSync(entityId)?.breadcrumbs ?? [{ id: "global", label: "Global", kind: "global" }];
   },
   async getAggregatedHealth(entityId: string) {
     await wait();

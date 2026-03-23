@@ -27,7 +27,7 @@ export function HierarchyTree({
   };
 
   return (
-    <div className="space-y-1 pb-3">
+    <div className="space-y-1 pb-3" role="tree" aria-label="Infrastructure hierarchy">
       {nodes.map((node) => (
         <HierarchyTreeNode
           key={node.entity.id}

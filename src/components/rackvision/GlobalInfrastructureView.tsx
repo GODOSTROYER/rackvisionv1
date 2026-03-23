@@ -78,6 +78,14 @@ export function GlobalInfrastructureView({
     loadSiteOverlay();
   }, [selectedEntityId, selectedEntityKind]);
 
+  useEffect(() => {
+    if (selectedEntityKind === "site" && selectedEntityId) {
+      setSelectedCountryCode(null);
+      setCountrySummary(null);
+      setCountrySites([]);
+    }
+  }, [selectedEntityId, selectedEntityKind]);
+
   const loadCountryContext = async (countryCode: string) => {
     setCountryLoading(true);
     setSelectedCountryCode(countryCode);
@@ -109,7 +117,7 @@ export function GlobalInfrastructureView({
   }
 
   if (loading) return <GlobalViewSkeleton />;
-  if (!summary || !markers.length) return <GlobalViewEmptyState />;
+  if (!summary) return <GlobalViewEmptyState />;
 
   const hint =
     selectedEntityKind === "site"
@@ -126,8 +134,8 @@ export function GlobalInfrastructureView({
           {selectedEntityName ? <span className="text-muted-foreground">• {selectedEntityName}</span> : null}
         </div>
         <div className="flex gap-1">
-          <Button variant={globalViewMode === "regions" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("regions")}>Regions</Button>
-          <Button variant={globalViewMode === "sites" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("sites")}>Sites</Button>
+          <Button variant={globalViewMode === "regions" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("regions")} aria-pressed={globalViewMode === "regions"}>Regions</Button>
+          <Button variant={globalViewMode === "sites" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("sites")} aria-pressed={globalViewMode === "sites"}>Sites</Button>
         </div>
       </div>
 

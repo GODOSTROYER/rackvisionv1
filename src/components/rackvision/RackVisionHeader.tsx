@@ -36,7 +36,7 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
           onSelectResult={props.onSearchResultSelect}
         />
         <Select value={props.regionId ?? undefined} onValueChange={props.onRegionChange}>
-          <SelectTrigger>
+          <SelectTrigger aria-label="Select region">
             <SelectValue placeholder="Region" />
           </SelectTrigger>
           <SelectContent>
@@ -48,7 +48,7 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
           </SelectContent>
         </Select>
         <Select value={props.siteId ?? undefined} onValueChange={props.onSiteChange}>
-          <SelectTrigger>
+          <SelectTrigger aria-label="Select site or data center">
             <SelectValue placeholder="Site / Data Center" />
           </SelectTrigger>
           <SelectContent>
