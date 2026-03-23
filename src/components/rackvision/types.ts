@@ -58,10 +58,13 @@ export type Device = BaseRackVisionEntity & {
   rackUnitSize: number;
   deviceType: DeviceType;
   ipAddress: string;
+  osPlatform: string;
   cpuUsage: number;
   memoryUsage: number;
   networkIo: string;
   temperature: number;
+  uptime: string;
+  alertCount: number;
   powerState: "On" | "Standby" | "Off";
 };
 
