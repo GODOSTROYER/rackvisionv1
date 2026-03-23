@@ -36,6 +36,7 @@ export type Site = BaseRackVisionEntity & {
   regionId: string;
   city: string;
   country: string;
+  countryCode: string;
   latitude: number;
   longitude: number;
 };
@@ -344,15 +345,47 @@ export type GlobeMarker = {
   longitude: number;
   healthStatus: HealthStatus;
   regionId?: string;
+  country?: string;
+  city?: string;
   metrics: {
     sites?: number;
+    rooms?: number;
+    rows?: number;
     racks: number;
     devices: number;
     warning: number;
     critical: number;
     activeAlerts: number;
     occupancyPercent?: number;
+    avgTemp?: number;
+    powerUtilization?: number;
   };
+};
+
+export type CountryInfrastructureSummary = {
+  countryCode: string;
+  countryName: string;
+  sites: number;
+  rooms: number;
+  rows: number;
+  racks: number;
+  devices: number;
+  warning: number;
+  critical: number;
+  activeAlerts: number;
+  avgOccupancy: number;
+  avgUtilization: number;
+  healthStatus: HealthStatus;
+  hasInfrastructure: boolean;
+};
+
+export type EntityHoverSummary = {
+  id: string;
+  kind: "country" | RackVisionEntityKind;
+  title: string;
+  subtitle?: string;
+  healthStatus: HealthStatus;
+  metrics: Array<{ label: string; value: string | number }>;
 };
 
 export type InspectorKind = Extract<RackVisionEntityKind, "region" | "site" | "room" | "row" | "rack" | "device">;
