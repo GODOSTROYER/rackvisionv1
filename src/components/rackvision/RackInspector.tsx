@@ -28,7 +28,9 @@ export function RackInspector({ summary }: { summary: InspectorSummary }) {
           if (firstDevice) navigate(`/systems/${firstDevice.id}`);
           else toast({ title: "No device linked", description: "Rack has no device records in mock data." });
         }}
-        onAction={(action) => toast({ title: action, description: "UI-only RackVision action." })}
+        onAction={(action) => {
+          toast({ title: action, description: "UI-only RackVision action." });
+        }}
       />
     </div>
   );

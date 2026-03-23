@@ -30,7 +30,9 @@ export function DeviceInspector({ summary }: { summary: InspectorSummary }) {
       <MetricRow label="Alert Count" value={String(device.alertCount)} />
       <QuickActionButtons
         onOpenSystem={() => navigate(`/systems/${device.id}`)}
-        onAction={(action) => toast({ title: action, description: "UI-only RackVision device action." })}
+        onAction={(action) => {
+          toast({ title: action, description: "UI-only RackVision device action." });
+        }}
       />
     </div>
   );
