@@ -6,12 +6,19 @@ import {
   HealthStatus,
   HierarchyNode,
   Rack,
+  RackFilters,
+  RackSortOption,
+  RackSummary,
   RackVisionEntity,
   RackVisionEntityKind,
   Region,
   RegionSummary,
+  RoomSummary,
   Room,
+  RowSummary,
   Row,
+  SiteCardSummary,
+  SiteOverview,
   Site,
   SiteSummary,
 } from "@/components/rackvision/types";
@@ -265,6 +272,33 @@ const siteMetrics: Record<string, { occupancy: number; avgTemp: number; powerUti
   "site-virginia-dc3": { occupancy: 85, avgTemp: 36, powerUtilization: 79, activeAlerts: 7 },
 };
 
+const siteMeta: Record<string, { facilityType: string; powerCapacity: string; coolingStatus: string; lastSync: string; networkStatus: string; availability: string }> = {
+  "site-mumbai-dc1": {
+    facilityType: "Tier III Colocation",
+    powerCapacity: "2.8 MW",
+    coolingStatus: "Stable",
+    lastSync: "2 min ago",
+    networkStatus: "Nominal",
+    availability: "99.96%",
+  },
+  "site-frankfurt-dc1": {
+    facilityType: "Enterprise Data Center",
+    powerCapacity: "2.2 MW",
+    coolingStatus: "Optimal",
+    lastSync: "3 min ago",
+    networkStatus: "Nominal",
+    availability: "99.99%",
+  },
+  "site-virginia-dc3": {
+    facilityType: "Hyperscale Edge Facility",
+    powerCapacity: "3.4 MW",
+    coolingStatus: "Needs Attention",
+    lastSync: "1 min ago",
+    networkStatus: "Degraded",
+    availability: "99.81%",
+  },
+};
+
 const rackMetrics: Record<string, { powerLoadKw: number; temperatureState: string; recentAlerts: string[] }> = {
   "rack-a-01": { powerLoadKw: 7.4, temperatureState: "Slightly Elevated", recentAlerts: ["RAID rebuild running", "Memory pressure above threshold"] },
   "rack-b-07": { powerLoadKw: 5.9, temperatureState: "Stable", recentAlerts: ["Backup job completed"] },
@@ -410,10 +444,170 @@ function getSiteSummarySync(siteId: string): SiteSummary {
     regionName: site ? getRegionById(site.regionId)?.name ?? "Unknown" : "Unknown",
     totalRacks: siteRacks.length,
     totalDevices: siteDevices.length,
+    totalRooms: siteRooms.length,
+    totalRows: siteRows.length,
     occupancyPercent: metrics?.occupancy ?? 0,
     activeAlerts: metrics?.activeAlerts ?? siteDevices.reduce((acc, device) => acc + device.alertCount, 0),
     avgTemp: metrics?.avgTemp ?? 0,
+    powerUtilization: metrics?.powerUtilization ?? 0,
+    healthScore: Math.max(0, 100 - siteDevices.filter((device) => device.healthStatus !== "Healthy").length * 8),
   };
+}
+
+function getSiteIdForEntity(entity: RackVisionEntity): string | null {
+  if (entity.kind === "site") return entity.id;
+  if (entity.kind === "room") return entity.siteId;
+  if (entity.kind === "row") return rooms.find((room) => room.id === entity.roomId)?.siteId ?? null;
+  if (entity.kind === "rack") {
+    const row = rows.find((item) => item.id === entity.rowId);
+    const room = row ? rooms.find((item) => item.id === row.roomId) : undefined;
+    return room?.siteId ?? null;
+  }
+  if (entity.kind === "device") {
+    const rack = racks.find((item) => item.id === entity.rackId);
+    const row = rack ? rows.find((item) => item.id === rack.rowId) : undefined;
+    const room = row ? rooms.find((item) => item.id === row.roomId) : undefined;
+    return room?.siteId ?? null;
+  }
+  return null;
+}
+
+function getRoomSummarySync(roomId: string): RoomSummary | null {
+  const room = rooms.find((item) => item.id === roomId);
+  if (!room) return null;
+  const roomRows = rows.filter((row) => row.roomId === room.id);
+  const roomRacks = racks.filter((rack) => roomRows.some((row) => row.id === rack.rowId));
+  const roomDevices = devices.filter((device) => roomRacks.some((rack) => rack.id === device.rackId));
+  return {
+    roomId: room.id,
+    siteId: room.siteId,
+    name: room.name,
+    healthStatus: room.healthStatus,
+    rowCount: roomRows.length,
+    rackCount: roomRacks.length,
+    deviceCount: roomDevices.length,
+    alertCount: roomDevices.reduce((acc, device) => acc + device.alertCount, 0),
+  };
+}
+
+function getRowSummarySync(rowId: string): RowSummary | null {
+  const row = rows.find((item) => item.id === rowId);
+  if (!row) return null;
+  const rowRacks = racks.filter((rack) => rack.rowId === row.id);
+  const rowDevices = devices.filter((device) => rowRacks.some((rack) => rack.id === device.rackId));
+  const averageTemp = rowDevices.length ? Math.round(rowDevices.reduce((acc, device) => acc + device.temperature, 0) / rowDevices.length) : 0;
+  const powerLoadKw = rowRacks.reduce((acc, rack) => acc + (rackMetrics[rack.id]?.powerLoadKw ?? 0), 0);
+  const occupancyPercent = rowRacks.length ? Math.round(rowRacks.reduce((acc, rack) => acc + rack.occupancyPercent, 0) / rowRacks.length) : 0;
+  return {
+    rowId: row.id,
+    roomId: row.roomId,
+    name: row.name,
+    healthStatus: row.healthStatus,
+    racks: rowRacks.length,
+    devices: rowDevices.length,
+    occupancyPercent,
+    activeAlerts: rowDevices.reduce((acc, device) => acc + device.alertCount, 0),
+    avgTemperature: averageTemp,
+    powerLoadKw: Number(powerLoadKw.toFixed(1)),
+  };
+}
+
+function getRackSummarySync(rackId: string): RackSummary | null {
+  const rack = racks.find((item) => item.id === rackId);
+  if (!rack) return null;
+  const row = rows.find((item) => item.id === rack.rowId);
+  const room = row ? rooms.find((item) => item.id === row.roomId) : undefined;
+  const site = room ? sites.find((item) => item.id === room.siteId) : undefined;
+  const rackDevices = devices.filter((device) => device.rackId === rack.id);
+  const usedUnits = Math.round((rack.totalUnits * rack.occupancyPercent) / 100);
+  const avgTemperature = rackDevices.length ? Math.round(rackDevices.reduce((acc, device) => acc + device.temperature, 0) / rackDevices.length) : 0;
+
+  return {
+    rackId: rack.id,
+    name: rack.name,
+    siteId: site?.id ?? "",
+    roomId: room?.id ?? "",
+    rowId: row?.id ?? "",
+    roomName: room?.name ?? "Unknown Room",
+    rowName: row?.name ?? "Unknown Row",
+    healthStatus: rack.healthStatus,
+    occupancyPercent: rack.occupancyPercent,
+    totalUnits: rack.totalUnits,
+    usedUnits,
+    availableUnits: rack.totalUnits - usedUnits,
+    deviceCount: rackDevices.length,
+    alertCount: rackDevices.reduce((acc, device) => acc + device.alertCount, 0),
+    powerLoadKw: rackMetrics[rack.id]?.powerLoadKw ?? 0,
+    avgTemperature,
+  };
+}
+
+function getSiteOverviewSync(siteId: string): SiteOverview | null {
+  const site = sites.find((item) => item.id === siteId);
+  if (!site) return null;
+  const regionName = getRegionById(site.regionId)?.name ?? "Unknown Region";
+  const summary = getSiteSummarySync(siteId);
+  const roomSummaries = rooms
+    .filter((room) => room.siteId === siteId)
+    .map((room) => getRoomSummarySync(room.id))
+    .filter((room): room is RoomSummary => Boolean(room));
+  return {
+    site,
+    regionName,
+    summary,
+    metadata: siteMeta[siteId] ?? {
+      facilityType: "Enterprise Facility",
+      powerCapacity: "1.8 MW",
+      coolingStatus: "Stable",
+      lastSync: "5 min ago",
+      networkStatus: "Nominal",
+      availability: "99.9%",
+    },
+    rooms: roomSummaries,
+  };
+}
+
+function getRegionSitesSync(regionId: string): SiteCardSummary[] {
+  return sites
+    .filter((site) => site.regionId === regionId)
+    .map((site) => {
+      const summary = getSiteSummarySync(site.id);
+      return {
+        siteId: site.id,
+        name: site.name,
+        city: site.city,
+        country: site.country,
+        healthStatus: site.healthStatus,
+        racks: summary.totalRacks,
+        devices: summary.totalDevices,
+        alerts: summary.activeAlerts,
+        occupancyPercent: summary.occupancyPercent,
+      };
+    });
+}
+
+function applyRackFilters(rackList: RackSummary[], filters: RackFilters) {
+  return rackList.filter((rack) => {
+    if (filters.status !== "all" && rack.healthStatus !== filters.status) return false;
+    if (filters.roomId !== "all" && rack.roomId !== filters.roomId) return false;
+    if (filters.rowId !== "all" && rack.rowId !== filters.rowId) return false;
+    if (filters.occupancy === "low" && rack.occupancyPercent >= 50) return false;
+    if (filters.occupancy === "medium" && (rack.occupancyPercent < 50 || rack.occupancyPercent > 79)) return false;
+    if (filters.occupancy === "high" && rack.occupancyPercent < 80) return false;
+    if (filters.alertLevel === "warning_critical" && rack.alertCount === 0) return false;
+    if (filters.alertLevel === "critical_only" && rack.healthStatus !== "Critical") return false;
+    return true;
+  });
+}
+
+function applyRackSort(rackList: RackSummary[], sortBy: RackSortOption) {
+  const list = [...rackList];
+  if (sortBy === "rack_id") return list.sort((a, b) => a.name.localeCompare(b.name));
+  if (sortBy === "occupancy") return list.sort((a, b) => b.occupancyPercent - a.occupancyPercent);
+  if (sortBy === "alerts") return list.sort((a, b) => b.alertCount - a.alertCount);
+  if (sortBy === "temperature") return list.sort((a, b) => b.avgTemperature - a.avgTemperature);
+  if (sortBy === "power") return list.sort((a, b) => b.powerLoadKw - a.powerLoadKw);
+  return list.sort((a, b) => healthPriority[b.healthStatus] - healthPriority[a.healthStatus]);
 }
 
 function buildRegionMarker(region: Region): GlobeMarker {
@@ -588,6 +782,94 @@ export const MockDataService = {
   async getSiteSummary(siteId: string) {
     await wait();
     return getSiteSummarySync(siteId);
+  },
+  async getRegionSites(regionId: string) {
+    await wait();
+    return getRegionSitesSync(regionId);
+  },
+  async getSiteOverview(siteId: string) {
+    await wait();
+    return getSiteOverviewSync(siteId);
+  },
+  async getSiteRooms(siteId: string) {
+    await wait();
+    return rooms
+      .filter((room) => room.siteId === siteId)
+      .map((room) => getRoomSummarySync(room.id))
+      .filter((room): room is RoomSummary => Boolean(room));
+  },
+  async getRoomRows(roomId: string) {
+    await wait();
+    return rows
+      .filter((row) => row.roomId === roomId)
+      .map((row) => getRowSummarySync(row.id))
+      .filter((row): row is RowSummary => Boolean(row));
+  },
+  async getRowRacks(rowId: string) {
+    await wait();
+    return racks
+      .filter((rack) => rack.rowId === rowId)
+      .map((rack) => getRackSummarySync(rack.id))
+      .filter((rack): rack is RackSummary => Boolean(rack));
+  },
+  async getRackSummary(rackId: string) {
+    await wait();
+    const summary = getRackSummarySync(rackId);
+    if (!summary) return null;
+    const rackDevices = devices.filter((device) => device.rackId === rackId);
+    return {
+      ...summary,
+      devices: rackDevices,
+      siteName: sites.find((site) => site.id === summary.siteId)?.name ?? "Unknown Site",
+    };
+  },
+  async searchInfrastructure(query: string) {
+    await wait(180);
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return allEntities;
+    return allEntities.filter((entity) => searchEntity(entity, normalized));
+  },
+  async filterRacks(siteId: string, filters: RackFilters, searchQuery: string) {
+    await wait(180);
+    const siteRacks = racks
+      .map((rack) => getRackSummarySync(rack.id))
+      .filter((rack): rack is RackSummary => Boolean(rack))
+      .filter((rack) => rack.siteId === siteId);
+    const searched = searchQuery.trim()
+      ? siteRacks.filter((rack) => {
+          const room = rooms.find((item) => item.id === rack.roomId);
+          const row = rows.find((item) => item.id === rack.rowId);
+          const text = `${rack.name} ${room?.name ?? ""} ${row?.name ?? ""}`.toLowerCase();
+          return text.includes(searchQuery.trim().toLowerCase());
+        })
+      : siteRacks;
+    return applyRackFilters(searched, filters);
+  },
+  async sortRacks(rackList: RackSummary[], sortBy: RackSortOption) {
+    await wait(120);
+    return applyRackSort(rackList, sortBy);
+  },
+  async getRowsForSite(siteId: string) {
+    await wait();
+    const siteRooms = rooms.filter((room) => room.siteId === siteId).map((room) => room.id);
+    return rows
+      .filter((row) => siteRooms.includes(row.roomId))
+      .map((row) => getRowSummarySync(row.id))
+      .filter((row): row is RowSummary => Boolean(row));
+  },
+  async getRacksForSite(siteId: string, filters?: RackFilters, sortBy?: RackSortOption, searchQuery = "") {
+    await wait();
+    const filtered = await this.filterRacks(
+      siteId,
+      filters ?? { status: "all", roomId: "all", rowId: "all", occupancy: "all", alertLevel: "all" },
+      searchQuery,
+    );
+    return applyRackSort(filtered, sortBy ?? "rack_id");
+  },
+  getSiteIdForEntity(entityId: string) {
+    const entity = allEntities.find((item) => item.id === entityId);
+    if (!entity) return null;
+    return getSiteIdForEntity(entity);
   },
   async getMarkerData(regionId?: string) {
     await wait();
