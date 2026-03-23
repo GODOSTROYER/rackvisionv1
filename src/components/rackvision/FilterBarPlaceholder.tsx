@@ -1,4 +1,4 @@
-import { Funnel } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { useRackVision } from "@/components/rackvision/RackVisionContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -8,7 +8,7 @@ export function FilterBarPlaceholder() {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
       <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-        <Funnel className="h-3.5 w-3.5" /> Filter bar (Step 1)
+        <SlidersHorizontal className="h-3.5 w-3.5" /> Filter bar (Step 1)
       </div>
       <Select value={state.statusFilter} onValueChange={(value) => dispatch({ type: "SET_STATUS_FILTER", payload: value as typeof state.statusFilter })}>
         <SelectTrigger className="w-[170px]">
