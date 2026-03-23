@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { runActionToast } from "@/components/rackvision/ActionToast";
 import { toast } from "@/hooks/use-toast";
 import { useRackVision } from "@/components/rackvision/RackVisionContext";
 import { RackEmptyState } from "@/components/rackvision/RackEmptyState";
@@ -22,6 +23,7 @@ type RackViewCanvasProps = {
 export function RackViewCanvas({ rackId, siteName, racksInContext, onSelectEntity, onOpenDevice }: RackViewCanvasProps) {
   const { state, dispatch } = useRackVision();
   const [loading, setLoading] = useState(true);
+  const [switchingRack, setSwitchingRack] = useState(false);
   const [model, setModel] = useState<RackViewModel | null>(null);
 
   const activeRackId = state.activeRackId ?? rackId;
@@ -49,10 +51,13 @@ export function RackViewCanvas({ rackId, siteName, racksInContext, onSelectEntit
   const rackOptions = useMemo(() => racksInContext, [racksInContext]);
 
   const handleSwitchRack = async (nextRackId: string) => {
+    setSwitchingRack(true);
     dispatch({ type: "SET_ACTIVE_RACK", payload: nextRackId });
     dispatch({ type: "SET_SELECTED_RACK", payload: nextRackId });
     dispatch({ type: "SET_SELECTED_DEVICE", payload: null });
     await onSelectEntity(nextRackId);
+    await runActionToast("Rack switched", `Now viewing ${nextRackId}.`);
+    setSwitchingRack(false);
   };
 
   const handleSelectDevice = async (deviceId: string) => {
@@ -91,9 +96,9 @@ export function RackViewCanvas({ rackId, siteName, racksInContext, onSelectEntit
         onPrevRack={handlePrev}
         onNextRack={handleNext}
         onOpenSystem={handleOpenSystem}
-        onViewAlerts={() => toast({ title: "View Alerts", description: "Rack alerts panel is a UI placeholder for now." })}
-        onMaintenance={() => toast({ title: "Maintenance Mode", description: "Maintenance mode action is simulated." })}
-        onExport={() => toast({ title: "Export Snapshot", description: "Rack snapshot export is a UI-only action." })}
+        onViewAlerts={async () => runActionToast("View Alerts", "Rack alerts panel is a UI placeholder for now.")}
+        onMaintenance={async () => runActionToast("Maintenance Mode", "Maintenance mode action is simulated.")}
+        onExport={async () => runActionToast("Export Snapshot", "Rack snapshot export is a UI-only action.")}
       />
 
       <RackSummaryStrip model={model} />
@@ -122,6 +127,8 @@ export function RackViewCanvas({ rackId, siteName, racksInContext, onSelectEntit
       ) : (
         <RackEmptyState />
       )}
+
+      {switchingRack ? <p className="text-xs text-muted-foreground">Switching rack context...</p> : null}
 
       <RackLegend />
     </section>
