@@ -85,11 +85,18 @@ export type RackVisionState = {
   selectedEntityId: string | null;
   selectedEntityKind: RackVisionEntityKind | null;
   inspectorEntityId: string | null;
+  selectedRoomId: string | null;
+  selectedRowId: string | null;
+  selectedRackId: string | null;
+  rackPreviewRackId: string | null;
   hoveredEntityId: string | null;
   selectedMarkerId: string | null;
   globalViewMode: "regions" | "sites";
   expandedNodeIds: string[];
   searchQuery: string;
+  rackSearchQuery: string;
+  rackSortBy: RackSortOption;
+  rackFilters: RackFilters;
   treeResults: string[];
   statusFilter: HealthStatus | "all";
   deviceTypeFilter: DeviceType | "all";
@@ -97,10 +104,25 @@ export type RackVisionState = {
   isLoading: boolean;
 };
 
+export type RackFilters = {
+  status: HealthStatus | "all";
+  roomId: string | "all";
+  rowId: string | "all";
+  occupancy: "all" | "low" | "medium" | "high";
+  alertLevel: "all" | "warning_critical" | "critical_only";
+};
+
+export type RackSortOption = "rack_id" | "occupancy" | "alerts" | "health" | "temperature" | "power";
+
 export type RackVisionAction =
   | { type: "SET_ACTIVE_VIEW"; payload: RackVisionView }
   | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
+  | { type: "SET_SELECTED_ROOM"; payload: string | null }
+  | { type: "SET_SELECTED_ROW"; payload: string | null }
+  | { type: "SET_SELECTED_RACK"; payload: string | null }
+  | { type: "OPEN_RACK_PREVIEW"; payload: string }
+  | { type: "CLOSE_RACK_PREVIEW" }
   | { type: "SET_HOVERED_ENTITY"; payload: string | null }
   | { type: "SET_SELECTED_MARKER"; payload: string | null }
   | { type: "SET_GLOBAL_VIEW_MODE"; payload: "regions" | "sites" }
@@ -109,6 +131,9 @@ export type RackVisionAction =
   | { type: "CLOSE_INSPECTOR" }
   | { type: "SET_SEARCH"; payload: string }
   | { type: "SET_TREE_SEARCH"; payload: string }
+  | { type: "SET_RACK_SEARCH"; payload: string }
+  | { type: "SET_RACK_FILTERS"; payload: RackFilters }
+  | { type: "SET_RACK_SORT"; payload: RackSortOption }
   | { type: "TOGGLE_NODE_EXPANDED"; payload: string }
   | { type: "SET_EXPANDED_NODES"; payload: string[] }
   | { type: "SET_TREE_RESULTS"; payload: string[] }
@@ -150,6 +175,80 @@ export type SiteSummary = {
   occupancyPercent: number;
   activeAlerts: number;
   avgTemp: number;
+  totalRooms?: number;
+  totalRows?: number;
+  powerUtilization?: number;
+  healthScore?: number;
+};
+
+export type SiteCardSummary = {
+  siteId: string;
+  name: string;
+  city: string;
+  country: string;
+  healthStatus: HealthStatus;
+  racks: number;
+  devices: number;
+  alerts: number;
+  occupancyPercent: number;
+};
+
+export type RoomSummary = {
+  roomId: string;
+  siteId: string;
+  name: string;
+  healthStatus: HealthStatus;
+  rowCount: number;
+  rackCount: number;
+  deviceCount: number;
+  alertCount: number;
+};
+
+export type RowSummary = {
+  rowId: string;
+  roomId: string;
+  name: string;
+  healthStatus: HealthStatus;
+  racks: number;
+  devices: number;
+  occupancyPercent: number;
+  activeAlerts: number;
+  avgTemperature: number;
+  powerLoadKw: number;
+};
+
+export type RackSummary = {
+  rackId: string;
+  name: string;
+  siteId: string;
+  roomId: string;
+  rowId: string;
+  roomName: string;
+  rowName: string;
+  healthStatus: HealthStatus;
+  occupancyPercent: number;
+  totalUnits: number;
+  usedUnits: number;
+  availableUnits: number;
+  deviceCount: number;
+  alertCount: number;
+  powerLoadKw: number;
+  avgTemperature: number;
+};
+
+export type SiteOverview = {
+  site: Site;
+  regionName: string;
+  summary: SiteSummary;
+  metadata: {
+    facilityType: string;
+    powerCapacity: string;
+    coolingStatus: string;
+    lastSync: string;
+    networkStatus: string;
+    availability: string;
+  };
+  rooms: RoomSummary[];
 };
 
 export type GlobeMarkerKind = "region" | "site";
