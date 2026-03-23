@@ -17,7 +17,16 @@ type InfrastructureGlobeProps = {
 };
 
 type CountryFeature = {
-  properties?: Record<string, string | number | undefined>;
+  type?: string;
+  geometry?: {
+    type?: string;
+  };
+  properties?: Record<string, unknown>;
+};
+
+type CountryCollectionLike = {
+  type?: string;
+  features?: unknown;
 };
 
 const countryAlias: Record<string, string> = {
@@ -32,6 +41,24 @@ function normalizeCountryCode(name: string, rawCode: string | undefined) {
   const code = rawCode?.trim().toUpperCase();
   if (code && code.length === 2 && code !== "-99") return code;
   return countryAlias[name.toLowerCase()] ?? name.slice(0, 2).toUpperCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeCountryFeatures(source: unknown): CountryFeature[] {
+  const rawFeatures = Array.isArray(source)
+    ? source
+    : isRecord(source) && Array.isArray((source as CountryCollectionLike).features)
+      ? ((source as CountryCollectionLike).features as unknown[])
+      : [];
+
+  return rawFeatures.filter((feature): feature is CountryFeature => {
+    if (!isRecord(feature)) return false;
+    const geometryType = isRecord(feature.geometry) ? feature.geometry.type : undefined;
+    return geometryType === "Polygon" || geometryType === "MultiPolygon";
+  });
 }
 
 function markerToSummary(marker: GlobeMarkerType, regionLookup: Record<string, string>): EntityHoverSummary {
@@ -77,13 +104,13 @@ export function InfrastructureGlobe({
   const [hoveredCountry, setHoveredCountry] = useState<{ code: string; name: string } | null>(null);
   const [countrySummaryCache, setCountrySummaryCache] = useState<Record<string, EntityHoverSummary>>({});
   const [palette, setPalette] = useState({
-    ocean: "hsl(214 42% 18%)",
-    atmosphere: "hsl(214 58% 62%)",
-    land: "hsl(214 28% 34%)",
-    landHovered: "hsl(214 46% 48%)",
-    landSelected: "hsl(213 72% 58%)",
-    border: "hsl(213 22% 64%)",
-    borderActive: "hsl(214 86% 74%)",
+    ocean: "hsl(214 36% 24%)",
+    atmosphere: "hsl(214 58% 70%)",
+    land: "hsl(214 34% 48%)",
+    landHovered: "hsl(214 54% 62%)",
+    landSelected: "hsl(213 78% 66%)",
+    border: "hsl(213 28% 72%)",
+    borderActive: "hsl(214 88% 84%)",
     healthy: "hsl(142 70% 42%)",
     warning: "hsl(40 92% 48%)",
     critical: "hsl(0 84% 52%)",
@@ -98,13 +125,13 @@ export function InfrastructureGlobe({
       return value ? `hsl(${value})` : fallback;
     };
     setPalette({
-      ocean: readVar("--primary", "hsl(214 42% 18%)"),
-      atmosphere: readVar("--accent", "hsl(214 58% 62%)"),
-      land: readVar("--secondary", "hsl(214 28% 34%)"),
-      landHovered: readVar("--accent", "hsl(214 46% 48%)"),
-      landSelected: readVar("--primary", "hsl(213 72% 58%)"),
-      border: readVar("--border", "hsl(213 22% 64%)"),
-      borderActive: readVar("--accent", "hsl(214 86% 74%)"),
+      ocean: readVar("--secondary", "hsl(214 36% 24%)"),
+      atmosphere: readVar("--accent", "hsl(214 58% 70%)"),
+      land: readVar("--muted", "hsl(214 34% 48%)"),
+      landHovered: readVar("--accent", "hsl(214 54% 62%)"),
+      landSelected: readVar("--primary", "hsl(213 78% 66%)"),
+      border: readVar("--border", "hsl(213 28% 72%)"),
+      borderActive: readVar("--accent", "hsl(214 88% 84%)"),
       healthy: readVar("--healthy", "hsl(142 70% 42%)"),
       warning: readVar("--warning", "hsl(40 92% 48%)"),
       critical: readVar("--critical", "hsl(0 84% 52%)"),
@@ -130,20 +157,36 @@ export function InfrastructureGlobe({
     const material = globeRef.current?.globeMaterial?.();
     if (!material) return;
     material.color.set(palette.ocean);
-    material.emissive.set(palette.ocean);
-    material.emissiveIntensity = 0.3;
-    material.shininess = 0.1;
-  }, [palette.ocean]);
+    material.emissive.set(palette.atmosphere);
+    material.emissiveIntensity = 0.08;
+    material.shininess = 0.25;
+  }, [palette.atmosphere, palette.ocean]);
 
   const countries = useMemo<CountryFeature[]>(() => {
-    const geoJson = countriesGeoJson as { features?: CountryFeature[] };
-    return Array.isArray(geoJson.features) ? geoJson.features : [];
+    return normalizeCountryFeatures(countriesGeoJson);
   }, []);
+
+  const countryCount = countries.length;
+
+  useEffect(() => {
+    const source = countriesGeoJson as unknown;
+    const isFeatureCollection = isRecord(source) && source.type === "FeatureCollection";
+    const isFeatureArray = Array.isArray(source);
+    console.log("[InfrastructureGlobe] country polygon source", {
+      isFeatureCollection,
+      isFeatureArray,
+      countryCount,
+      firstFeature: countries[0],
+    });
+  }, [countries, countryCount]);
 
   const countryCodeFor = useCallback((feature: CountryFeature) => {
     const props = feature?.properties ?? {};
-    const countryName = String(props.ADMIN ?? props.NAME ?? props.name ?? "Unknown");
-    const countryCode = normalizeCountryCode(countryName, String(props.ISO_A2 ?? props.iso_a2 ?? props.ISO2 ?? props.id ?? ""));
+    const countryName = String(props.ADMIN ?? props.NAME ?? props.name ?? props.NAME_EN ?? "Unknown");
+    const countryCode = normalizeCountryCode(
+      countryName,
+      String(props.ISO_A2 ?? props.iso_a2 ?? props.ISO2 ?? props["ISO3166-1-Alpha-2"] ?? props.id ?? ""),
+    );
     return { countryCode, countryName };
   }, []);
 
@@ -201,8 +244,8 @@ export function InfrastructureGlobe({
   useEffect(() => {
     const controls = globeRef.current?.controls?.();
     if (!controls) return;
-    controls.autoRotate = !hoveredCountry && !hoveredMarkerId && !selectedMarkerId && !selectedCountryCode;
-    controls.autoRotateSpeed = 0.07;
+    controls.autoRotate = false;
+    controls.autoRotateSpeed = 0.02;
     controls.enablePan = false;
     controls.minDistance = 165;
     controls.maxDistance = 290;
@@ -244,9 +287,9 @@ export function InfrastructureGlobe({
   const polygonAltitude = useCallback(
     (feature: CountryFeature) => {
       const { countryCode } = countryCodeFor(feature);
-      if (hoveredCountry?.code === countryCode) return 0.022;
-      if (countryCode === selectedCountryCode) return 0.016;
-      return 0.006;
+      if (hoveredCountry?.code === countryCode) return 0.026;
+      if (countryCode === selectedCountryCode) return 0.02;
+      return 0.009;
     },
     [countryCodeFor, hoveredCountry?.code, selectedCountryCode],
   );
@@ -254,16 +297,16 @@ export function InfrastructureGlobe({
   const pointColor = useCallback((marker: GlobeMarkerType) => statusTone[marker.healthStatus], [statusTone]);
 
   const pointAltitude = useCallback(
-    (marker: GlobeMarkerType) => (marker.id === selectedMarkerId ? 0.22 : marker.healthStatus === "Critical" ? 0.18 : 0.14),
+    (marker: GlobeMarkerType) => (marker.id === selectedMarkerId ? 0.26 : marker.healthStatus === "Critical" ? 0.22 : marker.healthStatus === "Warning" ? 0.2 : 0.18),
     [selectedMarkerId],
   );
 
   const pointRadius = useCallback(
     (marker: GlobeMarkerType) => {
-      if (marker.id === selectedMarkerId) return 0.72;
-      if (marker.healthStatus === "Critical") return 0.6;
-      if (marker.healthStatus === "Warning") return 0.54;
-      return 0.48;
+      if (marker.id === selectedMarkerId) return 0.82;
+      if (marker.healthStatus === "Critical") return 0.72;
+      if (marker.healthStatus === "Warning") return 0.66;
+      return 0.58;
     },
     [selectedMarkerId],
   );
@@ -327,10 +370,16 @@ export function InfrastructureGlobe({
           ringLat="latitude"
           ringLng="longitude"
           ringColor={pointColor}
-          ringMaxRadius={2.8}
-          ringPropagationSpeed={0.95}
+          ringMaxRadius={3.4}
+          ringPropagationSpeed={1.1}
           ringRepeatPeriod={1600}
         />
+
+        {!countryCount ? (
+          <div className="absolute left-3 top-3 z-20 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm">
+            Country polygon data failed to load.
+          </div>
+        ) : null}
 
         {selectedOrHoveredSummary ? (
           <div className="pointer-events-none absolute right-4 top-4 z-20">
