@@ -7,8 +7,11 @@ import {
   HierarchyNode,
   Rack,
   RackFilters,
+  RackDeviceFilter,
+  RackDeviceViewModel,
   RackSortOption,
   RackSummary,
+  RackViewModel,
   RackVisionEntity,
   RackVisionEntityKind,
   Region,
@@ -263,6 +266,86 @@ const devices: Device[] = [
     alertCount: 5,
     powerState: "On",
     healthStatus: "Critical",
+  },
+  {
+    id: "device-rack-a-pdu",
+    name: "PDU-A-01",
+    kind: "device",
+    parentId: "rack-a-01",
+    rackId: "rack-a-01",
+    rackUnitStart: 1,
+    rackUnitSize: 2,
+    deviceType: "PDU",
+    ipAddress: "10.12.1.240",
+    osPlatform: "Embedded",
+    cpuUsage: 9,
+    memoryUsage: 14,
+    networkIo: "12 Mbps",
+    temperature: 27,
+    uptime: "201d 3h",
+    alertCount: 0,
+    powerState: "On",
+    healthStatus: "Healthy",
+  },
+  {
+    id: "device-rack-a-blank-01",
+    name: "BLANK-A-01",
+    kind: "device",
+    parentId: "rack-a-01",
+    rackId: "rack-a-01",
+    rackUnitStart: 31,
+    rackUnitSize: 1,
+    deviceType: "Blank-Panel",
+    ipAddress: "0.0.0.0",
+    osPlatform: "N/A",
+    cpuUsage: 0,
+    memoryUsage: 0,
+    networkIo: "0 Mbps",
+    temperature: 0,
+    uptime: "N/A",
+    alertCount: 0,
+    powerState: "Off",
+    healthStatus: "Healthy",
+  },
+  {
+    id: "device-net-rack-pdu",
+    name: "PDU-NET-01",
+    kind: "device",
+    parentId: "net-rack-03",
+    rackId: "net-rack-03",
+    rackUnitStart: 1,
+    rackUnitSize: 2,
+    deviceType: "PDU",
+    ipAddress: "10.77.3.240",
+    osPlatform: "Embedded",
+    cpuUsage: 8,
+    memoryUsage: 11,
+    networkIo: "14 Mbps",
+    temperature: 31,
+    uptime: "180d 9h",
+    alertCount: 0,
+    powerState: "On",
+    healthStatus: "Healthy",
+  },
+  {
+    id: "device-net-rack-uplink",
+    name: "SW-UPLINK-03",
+    kind: "device",
+    parentId: "net-rack-03",
+    rackId: "net-rack-03",
+    rackUnitStart: 37,
+    rackUnitSize: 1,
+    deviceType: "Switch-ToR",
+    ipAddress: "10.77.3.3",
+    osPlatform: "Network OS",
+    cpuUsage: 35,
+    memoryUsage: 48,
+    networkIo: "780 Mbps",
+    temperature: 40,
+    uptime: "67d 16h",
+    alertCount: 1,
+    powerState: "On",
+    healthStatus: "Warning",
   },
 ];
 
@@ -610,6 +693,95 @@ function applyRackSort(rackList: RackSummary[], sortBy: RackSortOption) {
   return list.sort((a, b) => healthPriority[b.healthStatus] - healthPriority[a.healthStatus]);
 }
 
+function getRackDevicesSync(rackId: string) {
+  return devices
+    .filter((device) => device.rackId === rackId)
+    .sort((a, b) => b.rackUnitStart - a.rackUnitStart);
+}
+
+function getAdjacentRacksSync(rackId: string) {
+  const rack = racks.find((item) => item.id === rackId);
+  if (!rack) return { previousRackId: null as string | null, nextRackId: null as string | null };
+  const ordered = racks
+    .filter((item) => item.rowId === rack.rowId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const idx = ordered.findIndex((item) => item.id === rackId);
+  return {
+    previousRackId: idx > 0 ? ordered[idx - 1].id : null,
+    nextRackId: idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1].id : null,
+  };
+}
+
+function mapDeviceToGrid(device: Device): RackDeviceViewModel {
+  const gridRowStart = 43 - (device.rackUnitStart + device.rackUnitSize - 1);
+  return {
+    device,
+    gridRowStart,
+    gridRowSpan: device.rackUnitSize,
+  };
+}
+
+function getRackOccupancySync(rackId: string) {
+  const rack = getRackSummarySync(rackId);
+  if (!rack) return { occupancyPercent: 0, usedUnits: 0, availableUnits: 42 };
+  return {
+    occupancyPercent: rack.occupancyPercent,
+    usedUnits: rack.usedUnits,
+    availableUnits: rack.availableUnits,
+  };
+}
+
+function getAvailableRackUnitsSync(rackId: string) {
+  const occupied = new Set<number>();
+  getRackDevicesSync(rackId).forEach((device) => {
+    for (let unit = device.rackUnitStart; unit < device.rackUnitStart + device.rackUnitSize; unit += 1) {
+      occupied.add(unit);
+    }
+  });
+  return Array.from({ length: 42 }, (_, index) => index + 1).filter((unit) => !occupied.has(unit));
+}
+
+function applyDeviceFilters(list: Device[], filters: RackDeviceFilter, query: string, highlightCriticalOnly: boolean) {
+  const normalized = query.trim().toLowerCase();
+  return list.filter((device) => {
+    if (filters.type !== "all" && device.deviceType !== filters.type) return false;
+    if (filters.status !== "all" && device.healthStatus !== filters.status) return false;
+    if (highlightCriticalOnly && device.healthStatus !== "Critical") return false;
+    if (!normalized) return true;
+    return `${device.name} ${device.ipAddress} ${device.deviceType}`.toLowerCase().includes(normalized);
+  });
+}
+
+function getRackViewModelSync(rackId: string, filters?: RackDeviceFilter, query = "", highlightCriticalOnly = false): RackViewModel | null {
+  const rack = getRackSummarySync(rackId);
+  if (!rack) return null;
+  const filteredDevices = applyDeviceFilters(
+    getRackDevicesSync(rackId),
+    filters ?? { type: "all", status: "all" },
+    query,
+    highlightCriticalOnly,
+  );
+  const devicesView = filteredDevices.map(mapDeviceToGrid);
+  const occupied = new Set<number>();
+  filteredDevices.forEach((device) => {
+    for (let unit = device.rackUnitStart; unit < device.rackUnitStart + device.rackUnitSize; unit += 1) {
+      occupied.add(unit);
+    }
+  });
+  const emptyUnits = Array.from({ length: 42 }, (_, index) => index + 1).filter((unit) => !occupied.has(unit));
+  const adjacent = getAdjacentRacksSync(rackId);
+  return {
+    rack,
+    devices: devicesView,
+    emptyUnits,
+    occupancyPercent: rack.occupancyPercent,
+    usedUnits: rack.usedUnits,
+    availableUnits: rack.availableUnits,
+    previousRackId: adjacent.previousRackId,
+    nextRackId: adjacent.nextRackId,
+  };
+}
+
 function buildRegionMarker(region: Region): GlobeMarker {
   const summary = getRegionSummarySync(region.id);
   const descendants = descendantsOf(region.id);
@@ -678,7 +850,7 @@ export const MockDataService = {
   },
   async getDevicesByRack(rackId: string) {
     await wait();
-    return devices.filter((device) => device.rackId === rackId);
+    return getRackDevicesSync(rackId);
   },
   async getHierarchyTree() {
     await wait();
@@ -822,6 +994,38 @@ export const MockDataService = {
       devices: rackDevices,
       siteName: sites.find((site) => site.id === summary.siteId)?.name ?? "Unknown Site",
     };
+  },
+  async getRackViewModel(rackId: string, filters?: RackDeviceFilter, query = "", highlightCriticalOnly = false) {
+    await wait();
+    return getRackViewModelSync(rackId, filters, query, highlightCriticalOnly);
+  },
+  async getRackDevices(rackId: string) {
+    await wait();
+    return getRackDevicesSync(rackId);
+  },
+  async getDeviceById(deviceId: string) {
+    await wait();
+    return devices.find((device) => device.id === deviceId) ?? null;
+  },
+  async getRackOccupancy(rackId: string) {
+    await wait();
+    return getRackOccupancySync(rackId);
+  },
+  async getAvailableRackUnits(rackId: string) {
+    await wait();
+    return getAvailableRackUnitsSync(rackId);
+  },
+  async getAdjacentRacks(rackId: string) {
+    await wait();
+    return getAdjacentRacksSync(rackId);
+  },
+  async filterRackDevices(rackId: string, filters: RackDeviceFilter, query = "", highlightCriticalOnly = false) {
+    await wait(150);
+    return applyDeviceFilters(getRackDevicesSync(rackId), filters, query, highlightCriticalOnly);
+  },
+  async searchRackDevices(rackId: string, query: string) {
+    await wait(120);
+    return applyDeviceFilters(getRackDevicesSync(rackId), { type: "all", status: "all" }, query, false);
   },
   async searchInfrastructure(query: string) {
     await wait(180);
