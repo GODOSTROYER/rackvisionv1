@@ -1,12 +1,17 @@
-import { Download, RefreshCw, Search } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
+import { GlobalSearchCommand } from "@/components/rackvision/GlobalSearchCommand";
+import { RackVisionSearchResult } from "@/components/rackvision/types";
 import { PageHeader } from "@/components/enterprise/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type RackVisionHeaderProps = {
   searchQuery: string;
+  searchResults: RackVisionSearchResult[];
+  isSearchOpen: boolean;
+  onSearchOpenChange: (open: boolean) => void;
   onSearchQueryChange: (value: string) => void;
+  onSearchResultSelect: (result: RackVisionSearchResult) => void;
   regionId: string | null;
   siteId: string | null;
   regions: { id: string; name: string }[];
@@ -22,15 +27,14 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
     <div className="space-y-3">
       <PageHeader title="RackVision" subtitle="Visual infrastructure hierarchy and rack explorer" />
       <div className="grid gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-2 xl:grid-cols-5">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={props.searchQuery}
-            onChange={(event) => props.onSearchQueryChange(event.target.value)}
-            placeholder="Search hostname, system ID, rack, site, or IP"
-            className="pl-8"
-          />
-        </div>
+        <GlobalSearchCommand
+          query={props.searchQuery}
+          results={props.searchResults}
+          open={props.isSearchOpen}
+          onOpenChange={props.onSearchOpenChange}
+          onQueryChange={props.onSearchQueryChange}
+          onSelectResult={props.onSearchResultSelect}
+        />
         <Select value={props.regionId ?? undefined} onValueChange={props.onRegionChange}>
           <SelectTrigger>
             <SelectValue placeholder="Region" />
@@ -56,7 +60,7 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
           </SelectContent>
         </Select>
         <div className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
-          View mode + filter placeholders below
+          Search spans Regions/Sites/Rooms/Rows/Racks/Devices with context-aware drill-down.
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
