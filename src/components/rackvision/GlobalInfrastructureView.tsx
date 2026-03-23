@@ -1,13 +1,18 @@
+import { useEffect, useState } from "react";
 import { Globe2 } from "lucide-react";
+import { CountryInfrastructurePanel } from "@/components/rackvision/CountryInfrastructurePanel";
+import { GlobeLegend } from "@/components/rackvision/GlobeLegend";
 import { GlobalSummaryCards } from "@/components/rackvision/GlobalSummaryCards";
 import { GlobalViewEmptyState } from "@/components/rackvision/GlobalViewEmptyState";
 import { GlobalViewSkeleton } from "@/components/rackvision/GlobalViewSkeleton";
 import { InfrastructureGlobe } from "@/components/rackvision/InfrastructureGlobe";
 import { RegionSummaryPanel } from "@/components/rackvision/RegionSummaryPanel";
 import { SelectionHintBanner } from "@/components/rackvision/SelectionHintBanner";
+import { SiteInfrastructureOverlay } from "@/components/rackvision/SiteInfrastructureOverlay";
 import { SiteOverviewCanvas } from "@/components/rackvision/SiteOverviewCanvas";
 import { GlobalSummary, GlobeMarker, RackVisionEntityKind, RegionSummary, SiteSummary } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
+import { MockDataService } from "@/services/rackvision/MockDataService";
 
 type GlobalInfrastructureViewProps = {
   forceGlobalView?: boolean;
@@ -56,6 +61,35 @@ export function GlobalInfrastructureView({
   globalViewMode,
   onGlobalViewModeChange,
 }: GlobalInfrastructureViewProps) {
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string | null>(null);
+  const [countrySummary, setCountrySummary] = useState<Awaited<ReturnType<typeof MockDataService.getCountryInfrastructureSummary>> | null>(null);
+  const [countrySites, setCountrySites] = useState<Awaited<ReturnType<typeof MockDataService.getCountrySites>>>([]);
+  const [countryLoading, setCountryLoading] = useState(false);
+  const [selectedSiteOverlay, setSelectedSiteOverlay] = useState<Awaited<ReturnType<typeof MockDataService.getSiteInfrastructureSummary>> | null>(null);
+
+  useEffect(() => {
+    const loadSiteOverlay = async () => {
+      if (selectedEntityKind !== "site" || !selectedEntityId) {
+        setSelectedSiteOverlay(null);
+        return;
+      }
+      setSelectedSiteOverlay(await MockDataService.getSiteInfrastructureSummary(selectedEntityId));
+    };
+    loadSiteOverlay();
+  }, [selectedEntityId, selectedEntityKind]);
+
+  const loadCountryContext = async (countryCode: string) => {
+    setCountryLoading(true);
+    setSelectedCountryCode(countryCode);
+    const [summary, sitesInCountry] = await Promise.all([
+      MockDataService.getCountryInfrastructureSummary(countryCode),
+      MockDataService.getCountrySites(countryCode),
+    ]);
+    setCountrySummary(summary);
+    setCountrySites(sitesInCountry);
+    setCountryLoading(false);
+  };
+
   if (!forceGlobalView && selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
     return (
       <SiteOverviewCanvas
@@ -76,10 +110,10 @@ export function GlobalInfrastructureView({
 
   const hint =
     selectedEntityKind === "site"
-      ? "Site selected — detailed Site Overview and Rack Navigation panels are coming next."
+      ? "Site selected — globe stays active while site, room, row, and rack context layers deepen below."
       : selectedEntityKind === "region"
-        ? "Region selected — use markers or hierarchy to drill into a specific site."
-        : "Select a region or site marker to drill down and sync hierarchy + inspector.";
+        ? "Region selected — use country or site interactions to drill down and sync hierarchy + inspector."
+        : "Hover countries for in-country summaries, then click country or site markers to drill down.";
 
   return (
     <section className="space-y-3">
@@ -101,12 +135,40 @@ export function GlobalInfrastructureView({
         markers={markers}
         selectedMarkerId={selectedMarkerId}
         hoveredMarkerId={hoveredMarkerId}
+        selectedCountryCode={selectedCountryCode}
         onHoverMarker={onHoverMarker}
         onSelectMarker={onSelectMarker}
+        onSelectCountry={async (countryCode) => {
+          await loadCountryContext(countryCode);
+          const firstRegionId = (await MockDataService.getCountrySites(countryCode))[0]?.site.regionId;
+          if (firstRegionId) await onSelectEntity(firstRegionId);
+        }}
         regionLookup={regionLookup}
       />
 
+      <GlobeLegend />
+
+      {selectedCountryCode ? (
+        <CountryInfrastructurePanel
+          loading={countryLoading}
+          summary={countrySummary}
+          sites={countrySites}
+          onSelectSite={async (siteId) => {
+            await onSelectEntity(siteId);
+            onSelectMarker(siteId);
+          }}
+        />
+      ) : null}
+
       {selectedEntityKind === "region" && regionSummary ? <RegionSummaryPanel summary={regionSummary} /> : null}
+      {selectedEntityKind === "site" && siteSummary && selectedSiteOverlay?.site ? (
+        <SiteInfrastructureOverlay
+          siteName={selectedSiteOverlay.site.name}
+          summary={siteSummary}
+          roomCount={selectedSiteOverlay.roomCount}
+          rowCount={selectedSiteOverlay.rowCount}
+        />
+      ) : null}
     </section>
   );
 }

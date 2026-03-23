@@ -1,4 +1,3 @@
-import { StatusBadge } from "@/components/enterprise/StatusBadge";
 import { EntityHoverSummaryCard } from "@/components/rackvision/EntityHoverSummaryCard";
 import { GlobeMarker } from "@/components/rackvision/types";
 
@@ -24,14 +23,7 @@ export function MarkerTooltip({ marker, regionName }: MarkerTooltipProps) {
       { label: "Alerts", value: marker.metrics.activeAlerts },
       ...(typeof marker.metrics.occupancyPercent === "number" ? [{ label: "Occupancy", value: `${marker.metrics.occupancyPercent}%` }] : []),
     ],
-  } as const;
+  };
 
-  return (
-    <div>
-      <EntityHoverSummaryCard summary={summary} />
-      <div className="sr-only">
-        <StatusBadge status={marker.healthStatus} />
-      </div>
-    </div>
-  );
+  return <EntityHoverSummaryCard summary={summary} />;
 }
