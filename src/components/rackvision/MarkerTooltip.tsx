@@ -1,4 +1,5 @@
 import { StatusBadge } from "@/components/enterprise/StatusBadge";
+import { EntityHoverSummaryCard } from "@/components/rackvision/EntityHoverSummaryCard";
 import { GlobeMarker } from "@/components/rackvision/types";
 
 type MarkerTooltipProps = {
@@ -7,23 +8,29 @@ type MarkerTooltipProps = {
 };
 
 export function MarkerTooltip({ marker, regionName }: MarkerTooltipProps) {
+  const summary = {
+    id: marker.id,
+    kind: marker.kind,
+    title: marker.name,
+    subtitle: marker.kind === "site" ? `${marker.city ?? ""}, ${marker.country ?? ""}` : regionName,
+    healthStatus: marker.healthStatus,
+    metrics: [
+      ...(marker.kind === "region" ? [{ label: "Sites", value: marker.metrics.sites ?? 0 }] : []),
+      ...(marker.kind === "site" ? [{ label: "Region", value: regionName ?? "-" }] : []),
+      { label: "Racks", value: marker.metrics.racks },
+      { label: "Devices", value: marker.metrics.devices },
+      { label: "Warning", value: marker.metrics.warning },
+      { label: "Critical", value: marker.metrics.critical },
+      { label: "Alerts", value: marker.metrics.activeAlerts },
+      ...(typeof marker.metrics.occupancyPercent === "number" ? [{ label: "Occupancy", value: `${marker.metrics.occupancyPercent}%` }] : []),
+    ],
+  } as const;
+
   return (
-    <div className="w-60 rounded-lg border border-border bg-popover p-3 shadow-lg">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-popover-foreground">{marker.name}</p>
+    <div>
+      <EntityHoverSummaryCard summary={summary} />
+      <div className="sr-only">
         <StatusBadge status={marker.healthStatus} />
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {marker.kind === "region" ? <p>Sites: <span className="text-foreground">{marker.metrics.sites ?? 0}</span></p> : null}
-        {marker.kind === "site" ? <p>Region: <span className="text-foreground">{regionName ?? "-"}</span></p> : null}
-        <p>Racks: <span className="text-foreground">{marker.metrics.racks}</span></p>
-        <p>Devices: <span className="text-foreground">{marker.metrics.devices}</span></p>
-        <p>Warning: <span className="text-foreground">{marker.metrics.warning}</span></p>
-        <p>Critical: <span className="text-foreground">{marker.metrics.critical}</span></p>
-        <p>Alerts: <span className="text-foreground">{marker.metrics.activeAlerts}</span></p>
-        {typeof marker.metrics.occupancyPercent === "number" ? (
-          <p>Occupancy: <span className="text-foreground">{marker.metrics.occupancyPercent}%</span></p>
-        ) : null}
       </div>
     </div>
   );
