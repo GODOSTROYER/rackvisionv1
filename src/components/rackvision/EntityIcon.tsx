@@ -1,7 +1,8 @@
+import type { ComponentType } from "react";
 import { Building2, FolderTree, Network, Rows3, Server, ServerCog } from "lucide-react";
 import { RackVisionEntityKind } from "@/components/rackvision/types";
 
-const iconMap: Record<RackVisionEntityKind, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<RackVisionEntityKind, ComponentType<{ className?: string }>> = {
   global: Network,
   region: Network,
   site: Building2,
