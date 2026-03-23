@@ -6,6 +6,7 @@ const toneClasses: Record<string, string> = {
   warning: "bg-[hsl(var(--warning)/0.12)] text-[hsl(var(--warning))] border-[hsl(var(--warning)/0.35)]",
   critical: "bg-[hsl(var(--critical)/0.12)] text-[hsl(var(--critical))] border-[hsl(var(--critical)/0.35)]",
   offline: "bg-[hsl(var(--offline)/0.12)] text-[hsl(var(--offline))] border-[hsl(var(--offline)/0.3)]",
+  maintenance: "bg-muted text-muted-foreground border-border",
   info: "bg-[hsl(var(--info)/0.12)] text-[hsl(var(--info))] border-[hsl(var(--info)/0.3)]",
   default: "bg-muted text-muted-foreground border-border",
 };
@@ -19,6 +20,8 @@ export function StatusBadge({ status }: { status: string }) {
         ? "warning"
         : normalized.includes("offline")
           ? "offline"
+          : normalized.includes("maintenance")
+            ? "maintenance"
           : normalized.includes("healthy") || normalized.includes("installed") || normalized.includes("online")
             ? "healthy"
             : normalized.includes("info")
