@@ -38,6 +38,26 @@ const initialState: RackVisionState = {
   statusFilter: "all",
   deviceTypeFilter: "all",
   breadcrumbs: [{ id: "global", label: "Global", kind: "global" }],
+  globalSearchQuery: "",
+  globalSearchResults: [],
+  isSearchResultsOpen: false,
+  activeFilters: {
+    status: "all",
+    deviceType: "all",
+    criticalOnly: false,
+    offlineOnly: false,
+    regionId: "all",
+    siteId: "all",
+    roomId: "all",
+    rowId: "all",
+    alertSeverity: "all",
+    occupancyRange: "all",
+  },
+  layoutContext: {
+    siteId: null,
+    roomId: null,
+  },
+  lastRackVisionContext: null,
   isLoading: false,
 };
 
@@ -115,6 +135,36 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, deviceTypeFilter: action.payload };
     case "SET_BREADCRUMBS":
       return { ...state, breadcrumbs: action.payload };
+    case "SET_GLOBAL_SEARCH_QUERY":
+      return { ...state, globalSearchQuery: action.payload };
+    case "SET_GLOBAL_SEARCH_RESULTS":
+      return { ...state, globalSearchResults: action.payload };
+    case "OPEN_SEARCH_RESULTS":
+      return { ...state, isSearchResultsOpen: true };
+    case "CLOSE_SEARCH_RESULTS":
+      return { ...state, isSearchResultsOpen: false };
+    case "SET_ACTIVE_FILTERS":
+      return { ...state, activeFilters: action.payload };
+    case "CLEAR_ACTIVE_FILTERS":
+      return {
+        ...state,
+        activeFilters: {
+          status: "all",
+          deviceType: "all",
+          criticalOnly: false,
+          offlineOnly: false,
+          regionId: "all",
+          siteId: "all",
+          roomId: "all",
+          rowId: "all",
+          alertSeverity: "all",
+          occupancyRange: "all",
+        },
+      };
+    case "SET_LAYOUT_CONTEXT":
+      return { ...state, layoutContext: action.payload };
+    case "SET_LAST_RACKVISION_CONTEXT":
+      return { ...state, lastRackVisionContext: action.payload };
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
     default:
