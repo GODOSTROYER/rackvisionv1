@@ -7,8 +7,14 @@ import {
   HierarchyNode,
   Rack,
   RackFilters,
+  RackVisionActiveFilters,
+  RackVisionSearchResult,
   RackDeviceFilter,
   RackDeviceViewModel,
+  LayoutViewModel,
+  LayoutRoomPanelModel,
+  LayoutRowLaneModel,
+  LayoutRackTileModel,
   RackSortOption,
   RackSummary,
   RackViewModel,
@@ -24,6 +30,7 @@ import {
   SiteOverview,
   Site,
   SiteSummary,
+  SystemDetails,
 } from "@/components/rackvision/types";
 
 const DELAY_MS = 300;
@@ -827,6 +834,170 @@ function buildSiteMarker(site: Site): GlobeMarker {
   };
 }
 
+function toSearchGroup(kind: RackVisionEntity["kind"]): RackVisionSearchResult["group"] {
+  if (kind === "region") return "Regions";
+  if (kind === "site") return "Sites";
+  if (kind === "room") return "Rooms";
+  if (kind === "row") return "Rows";
+  if (kind === "rack") return "Racks";
+  return "Devices";
+}
+
+function getEntitySubtitle(entity: RackVisionEntity) {
+  if (entity.kind === "site") return `${entity.city}, ${entity.country}`;
+  if (entity.kind === "rack") return `${entity.name} • ${entity.occupancyPercent}% occupancy`;
+  if (entity.kind === "device") return `${entity.deviceType} • ${entity.ipAddress}`;
+  const parent = entity.parentId ? allEntities.find((candidate) => candidate.id === entity.parentId) : null;
+  return parent ? `Inside ${parent.name}` : "Global scope";
+}
+
+function mapToSearchResult(entity: RackVisionEntity): RackVisionSearchResult {
+  return {
+    id: entity.id,
+    name: entity.name,
+    kind: entity.kind,
+    subtitle: getEntitySubtitle(entity),
+    group: toSearchGroup(entity.kind),
+  };
+}
+
+function buildLayoutRackTile(rack: Rack): LayoutRackTileModel {
+  const summary = getRackSummarySync(rack.id);
+  return {
+    rackId: rack.id,
+    rackName: rack.name,
+    rowId: summary?.rowId ?? "",
+    rowName: summary?.rowName ?? "Unknown Row",
+    roomId: summary?.roomId ?? "",
+    roomName: summary?.roomName ?? "Unknown Room",
+    healthStatus: rack.healthStatus,
+    occupancyPercent: rack.occupancyPercent,
+    alertCount: summary?.alertCount ?? 0,
+    deviceCount: summary?.deviceCount ?? 0,
+  };
+}
+
+function getLayoutViewModelSync(scopeId: string): LayoutViewModel | null {
+  const site = sites.find((candidate) => candidate.id === scopeId);
+  const roomScope = rooms.find((candidate) => candidate.id === scopeId);
+  const effectiveSite = site ?? (roomScope ? sites.find((candidate) => candidate.id === roomScope.siteId) : null);
+  if (!effectiveSite) return null;
+
+  const scopeRooms = rooms.filter((room) => room.siteId === effectiveSite.id && (!roomScope || room.id === roomScope.id));
+  const roomPanels: LayoutRoomPanelModel[] = scopeRooms.map((room) => {
+    const roomRows = rows.filter((row) => row.roomId === room.id);
+    const rowLanes: LayoutRowLaneModel[] = roomRows.map((row) => {
+      const rowRacks = racks.filter((rack) => rack.rowId === row.id);
+      const summary = getRowSummarySync(row.id);
+      return {
+        rowId: row.id,
+        rowName: row.name,
+        roomId: room.id,
+        healthStatus: row.healthStatus,
+        occupancyPercent: summary?.occupancyPercent ?? 0,
+        activeAlerts: summary?.activeAlerts ?? 0,
+        racks: rowRacks.map(buildLayoutRackTile),
+      };
+    });
+
+    return {
+      roomId: room.id,
+      roomName: room.name,
+      healthStatus: room.healthStatus,
+      rows: rowLanes,
+    };
+  });
+
+  return {
+    siteId: effectiveSite.id,
+    siteName: effectiveSite.name,
+    regionName: getRegionById(effectiveSite.regionId)?.name ?? "Unknown Region",
+    rooms: roomPanels,
+  };
+}
+
+function getEntityContextSync(entityId: string) {
+  const entity = allEntities.find((item) => item.id === entityId);
+  if (!entity) return null;
+  const breadcrumbs: BreadcrumbItem[] = [{ id: "global", label: "Global", kind: "global" }];
+  const chain: RackVisionEntity[] = [];
+  let current: RackVisionEntity | undefined = entity;
+  while (current) {
+    chain.push(current);
+    current = current.parentId ? allEntities.find((item) => item.id === current?.parentId) : undefined;
+  }
+  chain.reverse().forEach((item) => breadcrumbs.push({ id: item.id, label: item.name, kind: item.kind }));
+  const siteId = getSiteIdForEntity(entity);
+  const roomId = chain.find((item) => item.kind === "room")?.id ?? null;
+  const rowId = chain.find((item) => item.kind === "row")?.id ?? null;
+  const rackId = chain.find((item) => item.kind === "rack")?.id ?? null;
+  return {
+    entity,
+    breadcrumbs,
+    siteId,
+    roomId,
+    rowId,
+    rackId,
+  };
+}
+
+function getSystemDetailsSync(systemId: string): SystemDetails | null {
+  const device = devices.find((item) => item.id === systemId || item.name === systemId);
+  if (!device) return null;
+  const rack = racks.find((item) => item.id === device.rackId);
+  const row = rack ? rows.find((item) => item.id === rack.rowId) : null;
+  const room = row ? rooms.find((item) => item.id === row.roomId) : null;
+  const site = room ? sites.find((item) => item.id === room.siteId) : null;
+  return {
+    systemId: device.id,
+    hostname: device.name,
+    deviceType: device.deviceType,
+    ipAddress: device.ipAddress,
+    osPlatform: device.osPlatform,
+    healthStatus: device.healthStatus,
+    rackId: rack?.id ?? "",
+    rackName: rack?.name ?? "Unknown Rack",
+    rowId: row?.id ?? "",
+    rowName: row?.name ?? "Unknown Row",
+    roomId: room?.id ?? "",
+    roomName: room?.name ?? "Unknown Room",
+    siteId: site?.id ?? "",
+    siteName: site?.name ?? "Unknown Site",
+    cpuUsage: device.cpuUsage,
+    memoryUsage: device.memoryUsage,
+    networkIo: device.networkIo,
+    temperature: device.temperature,
+    uptime: device.uptime,
+    alerts: device.alertCount,
+  };
+}
+
+function getFilteredEntitiesSync(filters: RackVisionActiveFilters) {
+  return allEntities.filter((entity) => {
+    if (filters.status !== "all" && entity.healthStatus !== filters.status) return false;
+    if (filters.offlineOnly && entity.healthStatus !== "Offline") return false;
+    if (filters.criticalOnly && entity.healthStatus !== "Critical") return false;
+    if (filters.deviceType !== "all" && entity.kind === "device" && entity.deviceType !== filters.deviceType) return false;
+    if (filters.regionId !== "all") {
+      const region = getRegionForEntity(entity);
+      if (!region || region.id !== filters.regionId) return false;
+    }
+    if (filters.siteId !== "all") {
+      const siteId = getSiteIdForEntity(entity);
+      if (siteId !== filters.siteId) return false;
+    }
+    if (filters.roomId !== "all") {
+      const roomId = entity.kind === "room" ? entity.id : collectAncestorIds(entity.id).find((id) => rooms.some((room) => room.id === id));
+      if (roomId !== filters.roomId) return false;
+    }
+    if (filters.rowId !== "all") {
+      const rowId = entity.kind === "row" ? entity.id : collectAncestorIds(entity.id).find((id) => rows.some((row) => row.id === id));
+      if (rowId !== filters.rowId) return false;
+    }
+    return true;
+  });
+}
+
 export const MockDataService = {
   async getRegions() {
     await wait();
@@ -1032,6 +1203,32 @@ export const MockDataService = {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return allEntities;
     return allEntities.filter((entity) => searchEntity(entity, normalized));
+  },
+  async searchRackVision(query: string) {
+    await wait(180);
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [] as RackVisionSearchResult[];
+    return allEntities.filter((entity) => searchEntity(entity, normalized)).map(mapToSearchResult);
+  },
+  async getEntityContext(entityId: string) {
+    await wait(140);
+    return getEntityContextSync(entityId);
+  },
+  async getLayoutViewModel(scopeId: string) {
+    await wait();
+    return getLayoutViewModelSync(scopeId);
+  },
+  async getSystemDetails(systemId: string) {
+    await wait();
+    return getSystemDetailsSync(systemId);
+  },
+  async getFilteredEntities(filters: RackVisionActiveFilters) {
+    await wait(160);
+    return getFilteredEntitiesSync(filters);
+  },
+  async getRecentAlertsForEntity(entityId: string) {
+    await wait(140);
+    return recentIssues.filter((issue) => issue.entityId === entityId || collectAncestorIds(issue.entityId).includes(entityId));
   },
   async filterRacks(siteId: string, filters: RackFilters, searchQuery: string) {
     await wait(180);
