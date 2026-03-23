@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
+import { AlertTriangle } from "lucide-react";
 import { EntityHoverSummaryCard } from "@/components/rackvision/EntityHoverSummaryCard";
-import { MockDataService } from "@/services/rackvision/MockDataService";
 import { EntityHoverSummary, GlobeMarker as GlobeMarkerType } from "@/components/rackvision/types";
 import countriesGeoJson from "@/data/countries.json";
+import { normalizeGeoJsonFeatures, type GeoJsonFeature } from "@/lib/geojson";
+import { MockDataService } from "@/services/rackvision/MockDataService";
 
 type InfrastructureGlobeProps = {
   markers: GlobeMarkerType[];
@@ -16,18 +18,6 @@ type InfrastructureGlobeProps = {
   regionLookup: Record<string, string>;
 };
 
-type CountryFeature = {
-  type?: string;
-  geometry?: {
-    type?: string;
-  };
-  properties?: Record<string, unknown>;
-};
-
-type CountryCollectionLike = {
-  type?: string;
-  features?: unknown;
-};
 
 const countryAlias: Record<string, string> = {
   "united states": "US",
@@ -43,23 +33,30 @@ function normalizeCountryCode(name: string, rawCode: string | undefined) {
   return countryAlias[name.toLowerCase()] ?? name.slice(0, 2).toUpperCase();
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
-function normalizeCountryFeatures(source: unknown): CountryFeature[] {
-  const rawFeatures = Array.isArray(source)
-    ? source
-    : isRecord(source) && Array.isArray((source as CountryCollectionLike).features)
-      ? ((source as CountryCollectionLike).features as unknown[])
-      : [];
+type GlobeController = {
+  globeMaterial?: () => {
+    color: { set: (value: string) => void };
+    emissive: { set: (value: string) => void };
+    emissiveIntensity: number;
+    shininess: number;
+  } | null;
+  controls?: () => {
+    autoRotate: boolean;
+    autoRotateSpeed: number;
+    enablePan: boolean;
+    minDistance: number;
+    maxDistance: number;
+    enableDamping: boolean;
+    dampingFactor: number;
+  } | null;
+  pointOfView: (
+    position: { lat: number; lng: number; altitude: number },
+    transitionMs?: number,
+  ) => void;
+};
 
-  return rawFeatures.filter((feature): feature is CountryFeature => {
-    if (!isRecord(feature)) return false;
-    const geometryType = isRecord(feature.geometry) ? feature.geometry.type : undefined;
-    return geometryType === "Polygon" || geometryType === "MultiPolygon";
-  });
-}
+type CountryFeature = GeoJsonFeature;
 
 function markerToSummary(marker: GlobeMarkerType, regionLookup: Record<string, string>): EntityHoverSummary {
   return {
@@ -98,19 +95,19 @@ export function InfrastructureGlobe({
   regionLookup,
 }: InfrastructureGlobeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const globeRef = useRef<any>(null);
+  const globeRef = useRef<GlobeController | null>(null);
   const hoveredMarkerIdRef = useRef<string | null>(null);
   const [size, setSize] = useState({ width: 640, height: 460 });
   const [hoveredCountry, setHoveredCountry] = useState<{ code: string; name: string } | null>(null);
   const [countrySummaryCache, setCountrySummaryCache] = useState<Record<string, EntityHoverSummary>>({});
   const [palette, setPalette] = useState({
-    ocean: "hsl(214 36% 24%)",
-    atmosphere: "hsl(214 58% 70%)",
-    land: "hsl(214 34% 48%)",
-    landHovered: "hsl(214 54% 62%)",
-    landSelected: "hsl(213 78% 66%)",
-    border: "hsl(213 28% 72%)",
-    borderActive: "hsl(214 88% 84%)",
+    ocean: "hsl(212 48% 36%)",
+    atmosphere: "hsl(203 92% 78%)",
+    land: "hsla(193 72% 68% / 0.92)",
+    landHovered: "hsla(185 88% 72% / 0.98)",
+    landSelected: "hsla(45 100% 72% / 0.98)",
+    border: "hsla(0 0% 100% / 0.52)",
+    borderActive: "hsla(48 100% 85% / 0.98)",
     healthy: "hsl(142 70% 42%)",
     warning: "hsl(40 92% 48%)",
     critical: "hsl(0 84% 52%)",
@@ -125,13 +122,13 @@ export function InfrastructureGlobe({
       return value ? `hsl(${value})` : fallback;
     };
     setPalette({
-      ocean: readVar("--secondary", "hsl(214 36% 24%)"),
-      atmosphere: readVar("--accent", "hsl(214 58% 70%)"),
-      land: readVar("--muted", "hsl(214 34% 48%)"),
-      landHovered: readVar("--accent", "hsl(214 54% 62%)"),
-      landSelected: readVar("--primary", "hsl(213 78% 66%)"),
-      border: readVar("--border", "hsl(213 28% 72%)"),
-      borderActive: readVar("--accent", "hsl(214 88% 84%)"),
+      ocean: readVar("--secondary", "hsl(212 48% 36%)"),
+      atmosphere: readVar("--accent", "hsl(203 92% 78%)"),
+      land: "hsla(193 72% 68% / 0.92)",
+      landHovered: "hsla(185 88% 72% / 0.98)",
+      landSelected: "hsla(45 100% 72% / 0.98)",
+      border: "hsla(0 0% 100% / 0.52)",
+      borderActive: "hsla(48 100% 85% / 0.98)",
       healthy: readVar("--healthy", "hsl(142 70% 42%)"),
       warning: readVar("--warning", "hsl(40 92% 48%)"),
       critical: readVar("--critical", "hsl(0 84% 52%)"),
@@ -157,28 +154,23 @@ export function InfrastructureGlobe({
     const material = globeRef.current?.globeMaterial?.();
     if (!material) return;
     material.color.set(palette.ocean);
-    material.emissive.set(palette.atmosphere);
-    material.emissiveIntensity = 0.08;
-    material.shininess = 0.25;
-  }, [palette.atmosphere, palette.ocean]);
+    material.emissive.set(palette.ocean);
+    material.emissiveIntensity = 0.03;
+    material.shininess = 0.12;
+  }, [palette.ocean]);
 
-  const countries = useMemo<CountryFeature[]>(() => {
-    return normalizeCountryFeatures(countriesGeoJson);
-  }, []);
-
+  const countryData = useMemo(() => normalizeGeoJsonFeatures(countriesGeoJson), []);
+  const countries = countryData.features;
   const countryCount = countries.length;
 
   useEffect(() => {
-    const source = countriesGeoJson as unknown;
-    const isFeatureCollection = isRecord(source) && source.type === "FeatureCollection";
-    const isFeatureArray = Array.isArray(source);
     console.log("[InfrastructureGlobe] country polygon source", {
-      isFeatureCollection,
-      isFeatureArray,
-      countryCount,
-      firstFeature: countries[0],
+      sourceKind: countryData.diagnostics.sourceKind,
+      totalFeatures: countryData.diagnostics.totalFeatures,
+      polygonCount: countryData.diagnostics.polygonFeatures,
+      firstFeature: countryData.diagnostics.firstFeature,
     });
-  }, [countries, countryCount]);
+  }, [countryData]);
 
   const countryCodeFor = useCallback((feature: CountryFeature) => {
     const props = feature?.properties ?? {};
@@ -289,7 +281,7 @@ export function InfrastructureGlobe({
       const { countryCode } = countryCodeFor(feature);
       if (hoveredCountry?.code === countryCode) return 0.026;
       if (countryCode === selectedCountryCode) return 0.02;
-      return 0.009;
+      return 0.014;
     },
     [countryCodeFor, hoveredCountry?.code, selectedCountryCode],
   );
@@ -343,12 +335,13 @@ export function InfrastructureGlobe({
           backgroundColor="rgba(0,0,0,0)"
           showAtmosphere
           atmosphereColor={palette.atmosphere}
-          atmosphereAltitude={0.08}
+          atmosphereAltitude={0.09}
           polygonsData={countries}
           polygonsTransitionDuration={0}
           polygonCapColor={polygonCapColor}
-          polygonSideColor={() => palette.land}
+          polygonSideColor={() => "hsla(197 78% 38% / 0.9)"}
           polygonStrokeColor={polygonStrokeColor}
+          polygonResolution={4}
           polygonAltitude={polygonAltitude}
           polygonLabel={null}
           onPolygonHover={onPolygonHover}
@@ -376,10 +369,20 @@ export function InfrastructureGlobe({
         />
 
         {!countryCount ? (
-          <div className="absolute left-3 top-3 z-20 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm">
-            Country polygon data failed to load.
+          <div className="absolute left-3 top-3 z-20 flex max-w-sm items-start gap-2 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
+            <div>
+              <div className="font-medium">Country polygon data failed to load.</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                Source: {countryData.diagnostics.sourceKind}. Total features: {countryData.diagnostics.totalFeatures}.
+              </div>
+            </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="absolute left-3 top-3 z-20 rounded-md border border-border/70 bg-background/85 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
+            Polygons: <span className="font-medium text-foreground">{countryCount}</span> · Shape: <span className="font-medium text-foreground">{countryData.diagnostics.sourceKind}</span>
+          </div>
+        )}
 
         {selectedOrHoveredSummary ? (
           <div className="pointer-events-none absolute right-4 top-4 z-20">
