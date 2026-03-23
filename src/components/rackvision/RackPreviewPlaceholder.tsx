@@ -1,10 +1,10 @@
 import { StatusBadge } from "@/components/enterprise/StatusBadge";
-import { Device, RackSummary } from "@/components/rackvision/types";
+import { RackSummary } from "@/components/rackvision/types";
 
 type RackPreviewPlaceholderProps = {
   rack: RackSummary;
   siteName: string;
-  devices: Device[];
+  devices: Array<{ id: string; name: string; deviceType: string; rackUnitStart: number }>;
 };
 
 export function RackPreviewPlaceholder({ rack, siteName, devices }: RackPreviewPlaceholderProps) {
