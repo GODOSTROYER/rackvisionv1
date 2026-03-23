@@ -6,7 +6,9 @@ export type DeviceType =
   | "Appliance-4U"
   | "Storage"
   | "Switch-ToR"
-  | "Firewall";
+  | "Firewall"
+  | "PDU"
+  | "Blank-Panel";
 
 export type RackVisionEntityKind = "global" | "region" | "site" | "room" | "row" | "rack" | "device";
 
@@ -88,6 +90,9 @@ export type RackVisionState = {
   selectedRoomId: string | null;
   selectedRowId: string | null;
   selectedRackId: string | null;
+  selectedDeviceId: string | null;
+  hoveredDeviceId: string | null;
+  activeRackId: string | null;
   rackPreviewRackId: string | null;
   hoveredEntityId: string | null;
   selectedMarkerId: string | null;
@@ -95,8 +100,12 @@ export type RackVisionState = {
   expandedNodeIds: string[];
   searchQuery: string;
   rackSearchQuery: string;
+  rackDeviceSearchQuery: string;
   rackSortBy: RackSortOption;
   rackFilters: RackFilters;
+  rackDeviceFilter: RackDeviceFilter;
+  showEmptyUnits: boolean;
+  highlightCriticalOnly: boolean;
   treeResults: string[];
   statusFilter: HealthStatus | "all";
   deviceTypeFilter: DeviceType | "all";
@@ -114,6 +123,11 @@ export type RackFilters = {
 
 export type RackSortOption = "rack_id" | "occupancy" | "alerts" | "health" | "temperature" | "power";
 
+export type RackDeviceFilter = {
+  type: DeviceType | "all";
+  status: HealthStatus | "all";
+};
+
 export type RackVisionAction =
   | { type: "SET_ACTIVE_VIEW"; payload: RackVisionView }
   | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
@@ -121,6 +135,9 @@ export type RackVisionAction =
   | { type: "SET_SELECTED_ROOM"; payload: string | null }
   | { type: "SET_SELECTED_ROW"; payload: string | null }
   | { type: "SET_SELECTED_RACK"; payload: string | null }
+  | { type: "SET_ACTIVE_RACK"; payload: string | null }
+  | { type: "SET_SELECTED_DEVICE"; payload: string | null }
+  | { type: "SET_HOVERED_DEVICE"; payload: string | null }
   | { type: "OPEN_RACK_PREVIEW"; payload: string }
   | { type: "CLOSE_RACK_PREVIEW" }
   | { type: "SET_HOVERED_ENTITY"; payload: string | null }
@@ -132,8 +149,12 @@ export type RackVisionAction =
   | { type: "SET_SEARCH"; payload: string }
   | { type: "SET_TREE_SEARCH"; payload: string }
   | { type: "SET_RACK_SEARCH"; payload: string }
+  | { type: "SET_RACK_DEVICE_SEARCH"; payload: string }
   | { type: "SET_RACK_FILTERS"; payload: RackFilters }
+  | { type: "SET_RACK_DEVICE_FILTER"; payload: RackDeviceFilter }
   | { type: "SET_RACK_SORT"; payload: RackSortOption }
+  | { type: "SET_SHOW_EMPTY_UNITS"; payload: boolean }
+  | { type: "SET_HIGHLIGHT_CRITICAL_ONLY"; payload: boolean }
   | { type: "TOGGLE_NODE_EXPANDED"; payload: string }
   | { type: "SET_EXPANDED_NODES"; payload: string[] }
   | { type: "SET_TREE_RESULTS"; payload: string[] }
@@ -234,6 +255,23 @@ export type RackSummary = {
   alertCount: number;
   powerLoadKw: number;
   avgTemperature: number;
+};
+
+export type RackDeviceViewModel = {
+  device: Device;
+  gridRowStart: number;
+  gridRowSpan: number;
+};
+
+export type RackViewModel = {
+  rack: RackSummary;
+  devices: RackDeviceViewModel[];
+  emptyUnits: number[];
+  occupancyPercent: number;
+  usedUnits: number;
+  availableUnits: number;
+  previousRackId: string | null;
+  nextRackId: string | null;
 };
 
 export type SiteOverview = {
