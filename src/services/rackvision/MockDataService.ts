@@ -1,25 +1,55 @@
 import {
   BreadcrumbItem,
   Device,
+  GlobalSummary,
+  GlobeMarker,
   HealthStatus,
   HierarchyNode,
   Rack,
   RackVisionEntity,
   RackVisionEntityKind,
   Region,
+  RegionSummary,
   Room,
   Row,
   Site,
+  SiteSummary,
 } from "@/components/rackvision/types";
 
 const DELAY_MS = 300;
-
 const wait = async (ms = DELAY_MS) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const regions: Region[] = [
-  { id: "region-ap-south", name: "AP-South", code: "AP", kind: "region", parentId: null, healthStatus: "Warning" },
-  { id: "region-us-east", name: "US-East", code: "US", kind: "region", parentId: null, healthStatus: "Healthy" },
-  { id: "region-eu-west", name: "EU-West", code: "EU", kind: "region", parentId: null, healthStatus: "Healthy" },
+  {
+    id: "region-ap-south",
+    name: "AP-South",
+    code: "AP",
+    kind: "region",
+    parentId: null,
+    healthStatus: "Warning",
+    latitude: 20.5937,
+    longitude: 78.9629,
+  },
+  {
+    id: "region-us-east",
+    name: "US-East",
+    code: "US",
+    kind: "region",
+    parentId: null,
+    healthStatus: "Healthy",
+    latitude: 37.0902,
+    longitude: -78.0,
+  },
+  {
+    id: "region-eu-west",
+    name: "EU-West",
+    code: "EU",
+    kind: "region",
+    parentId: null,
+    healthStatus: "Healthy",
+    latitude: 51.1657,
+    longitude: 10.4515,
+  },
 ];
 
 const sites: Site[] = [
@@ -31,6 +61,8 @@ const sites: Site[] = [
     regionId: "region-ap-south",
     city: "Mumbai",
     country: "India",
+    latitude: 19.076,
+    longitude: 72.8777,
     healthStatus: "Warning",
   },
   {
@@ -41,6 +73,8 @@ const sites: Site[] = [
     regionId: "region-eu-west",
     city: "Frankfurt",
     country: "Germany",
+    latitude: 50.1109,
+    longitude: 8.6821,
     healthStatus: "Healthy",
   },
   {
@@ -51,6 +85,8 @@ const sites: Site[] = [
     regionId: "region-us-east",
     city: "Ashburn",
     country: "USA",
+    latitude: 39.0438,
+    longitude: -77.4874,
     healthStatus: "Critical",
   },
 ];
@@ -230,21 +266,9 @@ const siteMetrics: Record<string, { occupancy: number; avgTemp: number; powerUti
 };
 
 const rackMetrics: Record<string, { powerLoadKw: number; temperatureState: string; recentAlerts: string[] }> = {
-  "rack-a-01": {
-    powerLoadKw: 7.4,
-    temperatureState: "Slightly Elevated",
-    recentAlerts: ["RAID rebuild running", "Memory pressure above threshold"],
-  },
-  "rack-b-07": {
-    powerLoadKw: 5.9,
-    temperatureState: "Stable",
-    recentAlerts: ["Backup job completed"],
-  },
-  "net-rack-03": {
-    powerLoadKw: 8.1,
-    temperatureState: "Hot Zone",
-    recentAlerts: ["Interface flaps detected", "Firewall CPU sustained >75%"],
-  },
+  "rack-a-01": { powerLoadKw: 7.4, temperatureState: "Slightly Elevated", recentAlerts: ["RAID rebuild running", "Memory pressure above threshold"] },
+  "rack-b-07": { powerLoadKw: 5.9, temperatureState: "Stable", recentAlerts: ["Backup job completed"] },
+  "net-rack-03": { powerLoadKw: 8.1, temperatureState: "Hot Zone", recentAlerts: ["Interface flaps detected", "Firewall CPU sustained >75%"] },
 };
 
 const recentIssues = [
@@ -255,6 +279,35 @@ const recentIssues = [
 ];
 
 const allEntities: RackVisionEntity[] = [...regions, ...sites, ...rooms, ...rows, ...racks, ...devices];
+
+const healthPriority: Record<HealthStatus, number> = { Healthy: 1, Warning: 2, Offline: 3, Maintenance: 4, Critical: 5 };
+
+function childrenOf(entityId: string) {
+  return allEntities.filter((entity) => entity.parentId === entityId);
+}
+
+function parentOf(entityId: string) {
+  const entity = allEntities.find((item) => item.id === entityId);
+  return entity?.parentId ? allEntities.find((item) => item.id === entity.parentId) : undefined;
+}
+
+function descendantsOf(entityId: string) {
+  const target = allEntities.find((entity) => entity.id === entityId);
+  if (!target) return [] as RackVisionEntity[];
+  const descendants: RackVisionEntity[] = [];
+  const stack: RackVisionEntity[] = [target];
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current) continue;
+    descendants.push(current);
+    stack.push(...childrenOf(current.id));
+  }
+  return descendants;
+}
+
+function countByKind(entityId: string, kind: RackVisionEntityKind) {
+  return descendantsOf(entityId).filter((entity) => entity.kind === kind).length;
+}
 
 function aggregateHealth(entities: RackVisionEntity[]) {
   return entities.reduce(
@@ -271,71 +324,141 @@ function aggregateHealth(entities: RackVisionEntity[]) {
   );
 }
 
-function childrenOf(entityId: string) {
-  return allEntities.filter((entity) => entity.parentId === entityId);
-}
-
-function parentOf(entityId: string) {
-  const target = allEntities.find((entity) => entity.id === entityId);
-  if (!target?.parentId) return undefined;
-  return allEntities.find((entity) => entity.id === target.parentId);
-}
-
-function descendantsOf(entityId: string) {
-  const target = allEntities.find((entity) => entity.id === entityId);
-  if (!target) return [] as RackVisionEntity[];
-
-  const descendants: RackVisionEntity[] = [];
-  const stack: RackVisionEntity[] = [target];
-
-  while (stack.length) {
-    const current = stack.pop();
-    if (!current) continue;
-    descendants.push(current);
-    stack.push(...childrenOf(current.id));
-  }
-
-  return descendants;
-}
-
-function countByKind(entityId: string, kind: RackVisionEntityKind) {
-  return descendantsOf(entityId).filter((entity) => entity.kind === kind).length;
-}
-
-function buildTree(parentId: string | null = null): HierarchyNode[] {
-  const roots = allEntities.filter((entity) => entity.parentId === parentId);
-  return roots.map((entity) => ({ entity, children: buildTree(entity.id) }));
-}
-
-function searchEntity(entity: RackVisionEntity, query: string) {
-  const baseText = `${entity.name} ${entity.kind}`.toLowerCase();
-  if (entity.kind === "device") {
-    return `${baseText} ${entity.ipAddress} ${entity.deviceType}`.includes(query);
-  }
-  if (entity.kind === "rack") {
-    return `${baseText} ${entity.occupancyPercent}`.includes(query);
-  }
-  return baseText.includes(query);
-}
-
-function collectAncestorIds(entityId: string) {
-  const ancestorIds: string[] = [];
-  let current = parentOf(entityId);
-  while (current) {
-    ancestorIds.push(current.id);
-    current = current.parentId ? allEntities.find((entity) => entity.id === current?.parentId) : undefined;
-  }
-  return ancestorIds;
-}
-
 function resolveHealthFromChildren(entityId: string): HealthStatus {
   const children = childrenOf(entityId);
   if (!children.length) return "Healthy";
-  if (children.some((child) => child.healthStatus === "Critical")) return "Critical";
-  if (children.some((child) => child.healthStatus === "Warning")) return "Warning";
-  if (children.some((child) => child.healthStatus === "Offline")) return "Offline";
-  if (children.some((child) => child.healthStatus === "Maintenance")) return "Maintenance";
-  return "Healthy";
+  return children.reduce((worst, child) => (healthPriority[child.healthStatus] > healthPriority[worst] ? child.healthStatus : worst), "Healthy" as HealthStatus);
+}
+
+function collectAncestorIds(entityId: string) {
+  const ids: string[] = [];
+  let current = parentOf(entityId);
+  while (current) {
+    ids.push(current.id);
+    current = current.parentId ? allEntities.find((item) => item.id === current?.parentId) : undefined;
+  }
+  return ids;
+}
+
+function buildTree(parentId: string | null = null): HierarchyNode[] {
+  return allEntities.filter((entity) => entity.parentId === parentId).map((entity) => ({ entity, children: buildTree(entity.id) }));
+}
+
+function searchEntity(entity: RackVisionEntity, query: string) {
+  const base = `${entity.name} ${entity.kind}`.toLowerCase();
+  if (entity.kind === "device") return `${base} ${entity.ipAddress} ${entity.deviceType}`.includes(query);
+  if (entity.kind === "rack") return `${base} ${entity.occupancyPercent}`.includes(query);
+  if (entity.kind === "site") return `${base} ${entity.city} ${entity.country}`.includes(query);
+  return base.includes(query);
+}
+
+function getRegionById(regionId: string) {
+  return regions.find((region) => region.id === regionId);
+}
+
+function getRegionForEntity(entity: RackVisionEntity) {
+  if (entity.kind === "region") return entity;
+  const regionId = [entity.id, ...collectAncestorIds(entity.id)]
+    .map((id) => allEntities.find((candidate) => candidate.id === id))
+    .find((candidate) => candidate?.kind === "region")?.id;
+  return regionId ? getRegionById(regionId) : undefined;
+}
+
+function getGlobalSummarySync(): GlobalSummary {
+  const criticalAlerts = devices.filter((device) => device.healthStatus === "Critical").reduce((acc, device) => acc + device.alertCount, 0);
+  const offlineCount = devices.filter((device) => device.healthStatus === "Offline").length;
+  return {
+    totalRegions: regions.length,
+    totalSites: sites.length,
+    totalRacks: racks.length,
+    totalDevices: devices.length,
+    criticalAlerts,
+    onlineCount: devices.length - offlineCount,
+    offlineCount,
+  };
+}
+
+function getRegionSummarySync(regionId: string): RegionSummary {
+  const regionSites = sites.filter((site) => site.regionId === regionId);
+  const regionSiteIds = regionSites.map((site) => site.id);
+  const regionRooms = rooms.filter((room) => regionSiteIds.includes(room.siteId));
+  const regionRows = rows.filter((row) => regionRooms.some((room) => room.id === row.roomId));
+  const regionRacks = racks.filter((rack) => regionRows.some((row) => row.id === rack.rowId));
+  const regionDevices = devices.filter((device) => regionRacks.some((rack) => rack.id === device.rackId));
+  const avgUtilization = regionRacks.length ? Math.round(regionRacks.reduce((acc, rack) => acc + rack.occupancyPercent, 0) / regionRacks.length) : 0;
+  const healthScore = Math.max(0, 100 - regionDevices.filter((device) => device.healthStatus !== "Healthy").length * 7);
+  return {
+    regionId,
+    sitesInRegion: regionSites.length,
+    totalRacks: regionRacks.length,
+    totalDevices: regionDevices.length,
+    activeAlerts: regionDevices.reduce((acc, device) => acc + device.alertCount, 0),
+    avgUtilization,
+    healthScore,
+  };
+}
+
+function getSiteSummarySync(siteId: string): SiteSummary {
+  const site = sites.find((item) => item.id === siteId);
+  const siteRooms = rooms.filter((room) => room.siteId === siteId);
+  const siteRows = rows.filter((row) => siteRooms.some((room) => room.id === row.roomId));
+  const siteRacks = racks.filter((rack) => siteRows.some((row) => row.id === rack.rowId));
+  const siteDevices = devices.filter((device) => siteRacks.some((rack) => rack.id === device.rackId));
+  const metrics = siteMetrics[siteId];
+  return {
+    siteId,
+    regionName: site ? getRegionById(site.regionId)?.name ?? "Unknown" : "Unknown",
+    totalRacks: siteRacks.length,
+    totalDevices: siteDevices.length,
+    occupancyPercent: metrics?.occupancy ?? 0,
+    activeAlerts: metrics?.activeAlerts ?? siteDevices.reduce((acc, device) => acc + device.alertCount, 0),
+    avgTemp: metrics?.avgTemp ?? 0,
+  };
+}
+
+function buildRegionMarker(region: Region): GlobeMarker {
+  const summary = getRegionSummarySync(region.id);
+  const descendants = descendantsOf(region.id);
+  const health = aggregateHealth(descendants);
+  return {
+    id: region.id,
+    kind: "region",
+    name: region.name,
+    latitude: region.latitude,
+    longitude: region.longitude,
+    healthStatus: region.healthStatus,
+    metrics: {
+      sites: summary.sitesInRegion,
+      racks: summary.totalRacks,
+      devices: summary.totalDevices,
+      warning: health.warning,
+      critical: health.critical,
+      activeAlerts: summary.activeAlerts,
+    },
+  };
+}
+
+function buildSiteMarker(site: Site): GlobeMarker {
+  const summary = getSiteSummarySync(site.id);
+  const descendants = descendantsOf(site.id);
+  const health = aggregateHealth(descendants);
+  return {
+    id: site.id,
+    kind: "site",
+    name: site.name,
+    latitude: site.latitude,
+    longitude: site.longitude,
+    regionId: site.regionId,
+    healthStatus: site.healthStatus,
+    metrics: {
+      racks: summary.totalRacks,
+      devices: summary.totalDevices,
+      warning: health.warning,
+      critical: health.critical,
+      activeAlerts: summary.activeAlerts,
+      occupancyPercent: summary.occupancyPercent,
+    },
+  };
 }
 
 export const MockDataService = {
@@ -343,94 +466,73 @@ export const MockDataService = {
     await wait();
     return regions;
   },
-
   async getSitesByRegion(regionId: string) {
     await wait();
     return sites.filter((site) => site.regionId === regionId);
   },
-
   async getRoomsBySite(siteId: string) {
     await wait();
     return rooms.filter((room) => room.siteId === siteId);
   },
-
   async getRowsByRoom(roomId: string) {
     await wait();
     return rows.filter((row) => row.roomId === roomId);
   },
-
   async getRacksByRow(rowId: string) {
     await wait();
     return racks.filter((rack) => rack.rowId === rowId);
   },
-
-  async getHierarchyTree() {
-    await wait();
-    return buildTree();
-  },
-
-  async getChildren(entityId: string) {
-    await wait();
-    return childrenOf(entityId);
-  },
-
   async getDevicesByRack(rackId: string) {
     await wait();
     return devices.filter((device) => device.rackId === rackId);
   },
-
+  async getHierarchyTree() {
+    await wait();
+    return buildTree();
+  },
+  async getChildren(entityId: string) {
+    await wait();
+    return childrenOf(entityId);
+  },
   async getAllEntities() {
     await wait();
     return allEntities;
   },
-
   async getEntityById(id: string) {
     await wait();
     return allEntities.find((entity) => entity.id === id);
   },
-
   async getBreadcrumbs(entityId: string) {
     await wait();
     const breadcrumbs: BreadcrumbItem[] = [{ id: "global", label: "Global", kind: "global" }];
     let current = allEntities.find((entity) => entity.id === entityId);
     const chain: RackVisionEntity[] = [];
-
     while (current) {
       chain.push(current);
       current = current.parentId ? allEntities.find((entity) => entity.id === current?.parentId) : undefined;
     }
-
-    chain
-      .reverse()
-      .forEach((entity) => breadcrumbs.push({ id: entity.id, label: entity.name, kind: entity.kind }));
-
+    chain.reverse().forEach((entity) => breadcrumbs.push({ id: entity.id, label: entity.name, kind: entity.kind }));
     return breadcrumbs;
   },
-
   async getAggregatedHealth(entityId: string) {
     await wait();
     const target = allEntities.find((entity) => entity.id === entityId);
     if (!target) return { total: 0, healthy: 0, warning: 0, critical: 0, offline: 0, maintenance: 0, rollupStatus: "Healthy" as HealthStatus };
-
     const descendants = descendantsOf(entityId);
     return { ...aggregateHealth(descendants), rollupStatus: resolveHealthFromChildren(entityId) };
   },
-
   async searchHierarchy(query: string) {
     await wait(180);
     const normalized = query.trim().toLowerCase();
     if (!normalized) return { matchedIds: [] as string[], expandedIds: [] as string[] };
-
     const matchedIds = allEntities.filter((entity) => searchEntity(entity, normalized)).map((entity) => entity.id);
     const expandedIds = Array.from(new Set(matchedIds.flatMap((id) => collectAncestorIds(id))));
     return { matchedIds, expandedIds };
   },
-
   async getEntitySummary(entityId: string) {
     await wait();
     const entity = allEntities.find((item) => item.id === entityId);
     if (!entity) return null;
-
     const health = await this.getAggregatedHealth(entityId);
     const counts = {
       sites: countByKind(entityId, "site"),
@@ -439,12 +541,10 @@ export const MockDataService = {
       racks: countByKind(entityId, "rack"),
       devices: countByKind(entityId, "device"),
     };
-
-    const site = entity.kind === "site" ? entity : entity.kind !== "region" ? allEntities.find((x) => x.id === collectAncestorIds(entity.id).find((id) => allEntities.find((e) => e.id === id)?.kind === "site")) : undefined;
+    const site = entity.kind === "site" ? entity : getRegionForEntity(entity)?.id ? sites.find((item) => item.id === collectAncestorIds(entity.id).find((id) => sites.some((s) => s.id === id))) : undefined;
     const selectedSiteMetrics = site ? siteMetrics[site.id] : undefined;
     const selectedRackMetrics = entity.kind === "rack" ? rackMetrics[entity.id] : undefined;
     const issueItems = recentIssues.filter((issue) => issue.entityId === entity.id || collectAncestorIds(issue.entityId).includes(entity.id)).slice(0, 4);
-
     return {
       entity,
       health,
@@ -458,9 +558,41 @@ export const MockDataService = {
       children: childrenOf(entity.id),
     };
   },
-
   async getRecentIssues(entityId: string) {
     await wait();
     return recentIssues.filter((issue) => issue.entityId === entityId || collectAncestorIds(issue.entityId).includes(entityId));
+  },
+  async getGlobalInfrastructureSummary() {
+    await wait();
+    return getGlobalSummarySync();
+  },
+  async getRegionsWithMetrics() {
+    await wait();
+    return regions.map((region) => ({
+      ...region,
+      summary: getRegionSummarySync(region.id),
+      health: aggregateHealth(descendantsOf(region.id)),
+    }));
+  },
+  async getSitesWithCoordinates(regionId?: string) {
+    await wait();
+    return (regionId ? sites.filter((site) => site.regionId === regionId) : sites).map((site) => ({
+      ...site,
+      summary: getSiteSummarySync(site.id),
+    }));
+  },
+  async getRegionSummary(regionId: string) {
+    await wait();
+    return getRegionSummarySync(regionId);
+  },
+  async getSiteSummary(siteId: string) {
+    await wait();
+    return getSiteSummarySync(siteId);
+  },
+  async getMarkerData(regionId?: string) {
+    await wait();
+    const regionMarkers = regions.map(buildRegionMarker);
+    const siteMarkers = (regionId ? sites.filter((site) => site.regionId === regionId) : sites).map(buildSiteMarker);
+    return { regionMarkers, siteMarkers };
   },
 };

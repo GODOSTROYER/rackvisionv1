@@ -6,6 +6,9 @@ const initialState: RackVisionState = {
   selectedEntityId: null,
   selectedEntityKind: null,
   inspectorEntityId: null,
+  hoveredEntityId: null,
+  selectedMarkerId: null,
+  globalViewMode: "regions",
   expandedNodeIds: [],
   searchQuery: "",
   treeResults: [],
@@ -25,7 +28,14 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
         ...state,
         selectedEntityId: action.payload.id,
         selectedEntityKind: action.payload.kind,
+        selectedMarkerId: action.payload.id,
       };
+    case "SET_HOVERED_ENTITY":
+      return { ...state, hoveredEntityId: action.payload };
+    case "SET_SELECTED_MARKER":
+      return { ...state, selectedMarkerId: action.payload };
+    case "SET_GLOBAL_VIEW_MODE":
+      return { ...state, globalViewMode: action.payload };
     case "OPEN_INSPECTOR":
       return { ...state, inspectorEntityId: action.payload };
     case "SET_INSPECTOR_ENTITY":
