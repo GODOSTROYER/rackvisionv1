@@ -51,7 +51,7 @@ export function GlobalInfrastructureView({
   selectedMarkerId,
   hoveredMarkerId,
   regionSummary,
-  siteSummary: _siteSummary,
+  siteSummary,
   regionLookup,
   onHoverMarker,
   onSelectMarker,
