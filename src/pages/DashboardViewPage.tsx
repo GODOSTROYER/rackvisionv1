@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActionButtonGroup } from "@/components/enterprise/ActionButtonGroup";
 import { ActivityFeedItem } from "@/components/enterprise/ActivityFeedItem";
-import { ChartPanel, HealthDonutChart, IncidentBarChart, UptimeLineChart } from "@/components/enterprise/ChartPanel";
+import { HealthDonutChart, IncidentBarChart, UptimeLineChart } from "@/components/enterprise/ChartPanel";
 import { DateRangePickerStub } from "@/components/enterprise/DateRangePickerStub";
 import { EnterpriseDataTable } from "@/components/enterprise/EnterpriseDataTable";
 import { FilterBar } from "@/components/enterprise/FilterBar";
