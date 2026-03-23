@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import DashboardViewPage from "@/pages/DashboardViewPage";
 import DashboardManagePage from "@/pages/DashboardManagePage";
+import RackVisionPage from "@/pages/RackVisionPage";
 import ClientPortalPage from "@/pages/ClientPortalPage";
 import SystemsPage from "@/pages/SystemsPage";
 import NetworksPage from "@/pages/NetworksPage";
@@ -34,8 +35,13 @@ const App = () => (
             <Route index element={<DashboardViewPage />} />
             <Route path="dashboard/view" element={<DashboardViewPage />} />
             <Route path="dashboard/manage" element={<DashboardManagePage />} />
+            <Route path="dashboard/rackvision" element={<RackVisionPage />} />
+            <Route path="dashboard/rackvision/region/:regionId" element={<RackVisionPage />} />
+            <Route path="dashboard/rackvision/site/:siteId" element={<RackVisionPage />} />
+            <Route path="dashboard/rackvision/rack/:rackId" element={<RackVisionPage />} />
             <Route path="client-portal" element={<ClientPortalPage />} />
             <Route path="systems" element={<SystemsPage />} />
+            <Route path="systems/:systemId" element={<SystemsPage />} />
             <Route path="networks" element={<NetworksPage />} />
             <Route path="automation" element={<AutomationPage />} />
             <Route path="reporting" element={<ReportingPage />} />
