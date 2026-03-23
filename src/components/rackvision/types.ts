@@ -25,6 +25,8 @@ export type BaseRackVisionEntity = {
 export type Region = BaseRackVisionEntity & {
   kind: "region";
   code: string;
+  latitude: number;
+  longitude: number;
 };
 
 export type Site = BaseRackVisionEntity & {
@@ -32,6 +34,8 @@ export type Site = BaseRackVisionEntity & {
   regionId: string;
   city: string;
   country: string;
+  latitude: number;
+  longitude: number;
 };
 
 export type Room = BaseRackVisionEntity & {
@@ -81,6 +85,9 @@ export type RackVisionState = {
   selectedEntityId: string | null;
   selectedEntityKind: RackVisionEntityKind | null;
   inspectorEntityId: string | null;
+  hoveredEntityId: string | null;
+  selectedMarkerId: string | null;
+  globalViewMode: "regions" | "sites";
   expandedNodeIds: string[];
   searchQuery: string;
   treeResults: string[];
@@ -94,6 +101,9 @@ export type RackVisionAction =
   | { type: "SET_ACTIVE_VIEW"; payload: RackVisionView }
   | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
+  | { type: "SET_HOVERED_ENTITY"; payload: string | null }
+  | { type: "SET_SELECTED_MARKER"; payload: string | null }
+  | { type: "SET_GLOBAL_VIEW_MODE"; payload: "regions" | "sites" }
   | { type: "OPEN_INSPECTOR"; payload: string }
   | { type: "SET_INSPECTOR_ENTITY"; payload: string | null }
   | { type: "CLOSE_INSPECTOR" }
@@ -110,6 +120,57 @@ export type RackVisionAction =
 export type HierarchyNode = {
   entity: RackVisionEntity;
   children: HierarchyNode[];
+};
+
+export type GlobalSummary = {
+  totalRegions: number;
+  totalSites: number;
+  totalRacks: number;
+  totalDevices: number;
+  criticalAlerts: number;
+  onlineCount: number;
+  offlineCount: number;
+};
+
+export type RegionSummary = {
+  regionId: string;
+  sitesInRegion: number;
+  totalRacks: number;
+  totalDevices: number;
+  activeAlerts: number;
+  avgUtilization: number;
+  healthScore: number;
+};
+
+export type SiteSummary = {
+  siteId: string;
+  regionName: string;
+  totalRacks: number;
+  totalDevices: number;
+  occupancyPercent: number;
+  activeAlerts: number;
+  avgTemp: number;
+};
+
+export type GlobeMarkerKind = "region" | "site";
+
+export type GlobeMarker = {
+  id: string;
+  kind: GlobeMarkerKind;
+  name: string;
+  latitude: number;
+  longitude: number;
+  healthStatus: HealthStatus;
+  regionId?: string;
+  metrics: {
+    sites?: number;
+    racks: number;
+    devices: number;
+    warning: number;
+    critical: number;
+    activeAlerts: number;
+    occupancyPercent?: number;
+  };
 };
 
 export type InspectorKind = Extract<RackVisionEntityKind, "region" | "site" | "room" | "row" | "rack" | "device">;
