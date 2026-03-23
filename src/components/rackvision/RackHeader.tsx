@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 type RackHeaderProps = {
   model: RackViewModel;
   siteName: string;
-  onPrevRack: () => void;
-  onNextRack: () => void;
-  onOpenSystem: () => void;
-  onViewAlerts: () => void;
-  onMaintenance: () => void;
-  onExport: () => void;
+  onPrevRack: () => Promise<void> | void;
+  onNextRack: () => Promise<void> | void;
+  onOpenSystem: () => Promise<void> | void;
+  onViewAlerts: () => Promise<void> | void;
+  onMaintenance: () => Promise<void> | void;
+  onExport: () => Promise<void> | void;
 };
 
 export function RackHeader({ model, siteName, onPrevRack, onNextRack, onOpenSystem, onViewAlerts, onMaintenance, onExport }: RackHeaderProps) {
