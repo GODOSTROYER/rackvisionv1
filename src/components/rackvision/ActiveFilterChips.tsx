@@ -10,19 +10,21 @@ type ActiveFilterChipsProps = {
 
 type ChipDef = { key: keyof RackVisionActiveFilters; label: string; value: string | boolean };
 
+const getChips = (filters: RackVisionActiveFilters): ChipDef[] => [
+  { key: "status", label: "Status", value: filters.status },
+  { key: "deviceType", label: "Device", value: filters.deviceType },
+  { key: "regionId", label: "Region", value: filters.regionId },
+  { key: "siteId", label: "Site", value: filters.siteId },
+  { key: "roomId", label: "Room", value: filters.roomId },
+  { key: "rowId", label: "Row", value: filters.rowId },
+  { key: "alertSeverity", label: "Alerts", value: filters.alertSeverity },
+  { key: "occupancyRange", label: "Occupancy", value: filters.occupancyRange },
+  { key: "criticalOnly", label: "Critical", value: filters.criticalOnly },
+  { key: "offlineOnly", label: "Offline", value: filters.offlineOnly },
+];
+
 export function ActiveFilterChips({ filters, onFiltersChange, onClearAll }: ActiveFilterChipsProps) {
-  const chips: ChipDef[] = [
-    { key: "status", label: "Status", value: filters.status },
-    { key: "deviceType", label: "Device", value: filters.deviceType },
-    { key: "regionId", label: "Region", value: filters.regionId },
-    { key: "siteId", label: "Site", value: filters.siteId },
-    { key: "roomId", label: "Room", value: filters.roomId },
-    { key: "rowId", label: "Row", value: filters.rowId },
-    { key: "alertSeverity", label: "Alerts", value: filters.alertSeverity },
-    { key: "occupancyRange", label: "Occupancy", value: filters.occupancyRange },
-    { key: "criticalOnly", label: "Critical", value: filters.criticalOnly },
-    { key: "offlineOnly", label: "Offline", value: filters.offlineOnly },
-  ].filter((chip) => (typeof chip.value === "boolean" ? chip.value : chip.value !== "all"));
+  const chips = getChips(filters).filter((chip) => (typeof chip.value === "boolean" ? chip.value : chip.value !== "all"));
 
   if (!chips.length) return null;
 
