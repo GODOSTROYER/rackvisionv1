@@ -1,6 +1,8 @@
 import {
   BreadcrumbItem,
+  CountryInfrastructureSummary,
   Device,
+  EntityHoverSummary,
   GlobalSummary,
   GlobeMarker,
   HealthStatus,
@@ -78,6 +80,7 @@ const sites: Site[] = [
     regionId: "region-ap-south",
     city: "Mumbai",
     country: "India",
+    countryCode: "IN",
     latitude: 19.076,
     longitude: 72.8777,
     healthStatus: "Warning",
@@ -90,6 +93,7 @@ const sites: Site[] = [
     regionId: "region-eu-west",
     city: "Frankfurt",
     country: "Germany",
+    countryCode: "DE",
     latitude: 50.1109,
     longitude: 8.6821,
     healthStatus: "Healthy",
@@ -101,7 +105,8 @@ const sites: Site[] = [
     parentId: "region-us-east",
     regionId: "region-us-east",
     city: "Ashburn",
-    country: "USA",
+    country: "United States",
+    countryCode: "US",
     latitude: 39.0438,
     longitude: -77.4874,
     healthStatus: "Critical",
@@ -522,6 +527,52 @@ function getRegionSummarySync(regionId: string): RegionSummary {
   };
 }
 
+function getCountrySummarySync(countryCode: string): CountryInfrastructureSummary {
+  const code = countryCode.toUpperCase();
+  const countrySites = sites.filter((site) => site.countryCode === code);
+  const countrySiteIds = countrySites.map((site) => site.id);
+  const countryRooms = rooms.filter((room) => countrySiteIds.includes(room.siteId));
+  const countryRoomIds = countryRooms.map((room) => room.id);
+  const countryRows = rows.filter((row) => countryRoomIds.includes(row.roomId));
+  const countryRowIds = countryRows.map((row) => row.id);
+  const countryRacks = racks.filter((rack) => countryRowIds.includes(rack.rowId));
+  const countryRackIds = countryRacks.map((rack) => rack.id);
+  const countryDevices = devices.filter((device) => countryRackIds.includes(device.rackId));
+
+  const warning = countryDevices.filter((device) => device.healthStatus === "Warning").length;
+  const critical = countryDevices.filter((device) => device.healthStatus === "Critical").length;
+  const activeAlerts = countryDevices.reduce((acc, device) => acc + device.alertCount, 0);
+  const avgOccupancy = countryRacks.length
+    ? Math.round(countryRacks.reduce((acc, rack) => acc + rack.occupancyPercent, 0) / countryRacks.length)
+    : 0;
+  const avgUtilization = countrySites.length
+    ? Math.round(
+        countrySites
+          .map((site) => siteMetrics[site.id]?.powerUtilization ?? 0)
+          .reduce((acc, value) => acc + value, 0) / countrySites.length,
+      )
+    : 0;
+
+  const healthStatus: HealthStatus = critical > 0 ? "Critical" : warning > 0 ? "Warning" : countrySites.length ? "Healthy" : "Maintenance";
+
+  return {
+    countryCode: code,
+    countryName: countrySites[0]?.country ?? code,
+    sites: countrySites.length,
+    rooms: countryRooms.length,
+    rows: countryRows.length,
+    racks: countryRacks.length,
+    devices: countryDevices.length,
+    warning,
+    critical,
+    activeAlerts,
+    avgOccupancy,
+    avgUtilization,
+    healthStatus,
+    hasInfrastructure: countrySites.length > 0,
+  };
+}
+
 function getSiteSummarySync(siteId: string): SiteSummary {
   const site = sites.find((item) => item.id === siteId);
   const siteRooms = rooms.filter((room) => room.siteId === siteId);
@@ -815,6 +866,8 @@ function buildSiteMarker(site: Site): GlobeMarker {
   const summary = getSiteSummarySync(site.id);
   const descendants = descendantsOf(site.id);
   const health = aggregateHealth(descendants);
+  const roomCount = rooms.filter((room) => room.siteId === site.id).length;
+  const rowCount = rows.filter((row) => rooms.some((room) => room.siteId === site.id && room.id === row.roomId)).length;
   return {
     id: site.id,
     kind: "site",
@@ -822,15 +875,150 @@ function buildSiteMarker(site: Site): GlobeMarker {
     latitude: site.latitude,
     longitude: site.longitude,
     regionId: site.regionId,
+    country: site.country,
+    city: site.city,
     healthStatus: site.healthStatus,
     metrics: {
+      rooms: roomCount,
+      rows: rowCount,
       racks: summary.totalRacks,
       devices: summary.totalDevices,
       warning: health.warning,
       critical: health.critical,
       activeAlerts: summary.activeAlerts,
       occupancyPercent: summary.occupancyPercent,
+      avgTemp: summary.avgTemp,
+      powerUtilization: summary.powerUtilization,
     },
+  };
+}
+
+function getEntityHoverSummarySync(entityId: string, kind?: RackVisionEntityKind | "country"): EntityHoverSummary | null {
+  if (kind === "country") {
+    const countrySummary = getCountrySummarySync(entityId);
+    return {
+      id: countrySummary.countryCode,
+      kind: "country",
+      title: countrySummary.countryName,
+      subtitle: "Country",
+      healthStatus: countrySummary.healthStatus,
+      metrics: [
+        { label: "Sites", value: countrySummary.sites },
+        { label: "Rooms", value: countrySummary.rooms },
+        { label: "Rows", value: countrySummary.rows },
+        { label: "Racks", value: countrySummary.racks },
+        { label: "Devices", value: countrySummary.devices },
+        { label: "Alerts", value: countrySummary.activeAlerts },
+        { label: "Occupancy", value: `${countrySummary.avgOccupancy}%` },
+      ],
+    };
+  }
+
+  const entity = allEntities.find((item) => item.id === entityId);
+  if (!entity) return null;
+  if (entity.kind === "site") {
+    const summary = getSiteSummarySync(entity.id);
+    return {
+      id: entity.id,
+      kind: entity.kind,
+      title: entity.name,
+      subtitle: `${entity.city}, ${entity.country}`,
+      healthStatus: entity.healthStatus,
+      metrics: [
+        { label: "Rooms", value: summary.totalRooms ?? 0 },
+        { label: "Rows", value: summary.totalRows ?? 0 },
+        { label: "Racks", value: summary.totalRacks },
+        { label: "Devices", value: summary.totalDevices },
+        { label: "Alerts", value: summary.activeAlerts },
+        { label: "Occupancy", value: `${summary.occupancyPercent}%` },
+      ],
+    };
+  }
+
+  if (entity.kind === "room") {
+    const summary = getRoomSummarySync(entity.id);
+    if (!summary) return null;
+    return {
+      id: entity.id,
+      kind: entity.kind,
+      title: entity.name,
+      subtitle: "Room",
+      healthStatus: entity.healthStatus,
+      metrics: [
+        { label: "Rows", value: summary.rowCount },
+        { label: "Racks", value: summary.rackCount },
+        { label: "Devices", value: summary.deviceCount },
+        { label: "Alerts", value: summary.alertCount },
+      ],
+    };
+  }
+
+  if (entity.kind === "row") {
+    const summary = getRowSummarySync(entity.id);
+    if (!summary) return null;
+    return {
+      id: entity.id,
+      kind: entity.kind,
+      title: entity.name,
+      subtitle: "Row",
+      healthStatus: entity.healthStatus,
+      metrics: [
+        { label: "Racks", value: summary.racks },
+        { label: "Devices", value: summary.devices },
+        { label: "Alerts", value: summary.activeAlerts },
+        { label: "Occupancy", value: `${summary.occupancyPercent}%` },
+      ],
+    };
+  }
+
+  if (entity.kind === "rack") {
+    const summary = getRackSummarySync(entity.id);
+    if (!summary) return null;
+    return {
+      id: entity.id,
+      kind: entity.kind,
+      title: entity.name,
+      subtitle: `${summary.roomName} • ${summary.rowName}`,
+      healthStatus: entity.healthStatus,
+      metrics: [
+        { label: "Devices", value: summary.deviceCount },
+        { label: "Alerts", value: summary.alertCount },
+        { label: "Used U", value: summary.usedUnits },
+        { label: "Temp", value: `${summary.avgTemperature}°C` },
+      ],
+    };
+  }
+
+  if (entity.kind === "device") {
+    return {
+      id: entity.id,
+      kind: entity.kind,
+      title: entity.name,
+      subtitle: `${entity.deviceType} • ${entity.ipAddress}`,
+      healthStatus: entity.healthStatus,
+      metrics: [
+        { label: "CPU", value: `${entity.cpuUsage}%` },
+        { label: "Memory", value: `${entity.memoryUsage}%` },
+        { label: "Temp", value: `${entity.temperature}°C` },
+        { label: "Alerts", value: entity.alertCount },
+      ],
+    };
+  }
+
+  const health = aggregateHealth(descendantsOf(entity.id));
+  return {
+    id: entity.id,
+    kind: entity.kind,
+    title: entity.name,
+    subtitle: entity.kind === "region" ? "Region" : "Entity",
+    healthStatus: entity.healthStatus,
+    metrics: [
+      { label: "Sites", value: countByKind(entity.id, "site") },
+      { label: "Racks", value: countByKind(entity.id, "rack") },
+      { label: "Devices", value: countByKind(entity.id, "device") },
+      { label: "Warning", value: health.warning },
+      { label: "Critical", value: health.critical },
+    ],
   };
 }
 
@@ -1221,6 +1409,32 @@ export const MockDataService = {
   async getSystemDetails(systemId: string) {
     await wait();
     return getSystemDetailsSync(systemId);
+  },
+  async getCountryInfrastructureSummary(countryCode: string) {
+    await wait();
+    return getCountrySummarySync(countryCode);
+  },
+  async getCountrySites(countryCode: string) {
+    await wait();
+    return sites.filter((site) => site.countryCode === countryCode.toUpperCase()).map((site) => ({
+      site,
+      summary: getSiteSummarySync(site.id),
+    }));
+  },
+  async getSiteInfrastructureSummary(siteId: string) {
+    await wait();
+    const site = sites.find((item) => item.id === siteId);
+    if (!site) return null;
+    return {
+      site,
+      summary: getSiteSummarySync(siteId),
+      roomCount: rooms.filter((room) => room.siteId === siteId).length,
+      rowCount: rows.filter((row) => rooms.some((room) => room.siteId === siteId && room.id === row.roomId)).length,
+    };
+  },
+  async getEntityHoverSummary(entityId: string, kind?: RackVisionEntityKind | "country") {
+    await wait(120);
+    return getEntityHoverSummarySync(entityId, kind);
   },
   async getFilteredEntities(filters: RackVisionActiveFilters) {
     await wait(160);
