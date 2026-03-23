@@ -27,6 +27,20 @@ const countryAlias: Record<string, string> = {
   germany: "DE",
 };
 
+function normalizeCssColor(input: string, fallback: string) {
+  if (typeof document === "undefined") return fallback;
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return fallback;
+
+  context.fillStyle = fallback;
+  const fallbackColor = context.fillStyle;
+  context.fillStyle = fallback;
+  context.fillStyle = input;
+
+  return context.fillStyle || fallbackColor || fallback;
+}
+
 function normalizeCountryCode(name: string, rawCode: string | undefined) {
   const code = rawCode?.trim().toUpperCase();
   if (code && code.length === 2 && code !== "-99") return code;
@@ -101,39 +115,39 @@ export function InfrastructureGlobe({
   const [hoveredCountry, setHoveredCountry] = useState<{ code: string; name: string } | null>(null);
   const [countrySummaryCache, setCountrySummaryCache] = useState<Record<string, EntityHoverSummary>>({});
   const [palette, setPalette] = useState({
-    ocean: "hsl(212 48% 36%)",
-    atmosphere: "hsl(203 92% 78%)",
-    land: "hsla(193 72% 68% / 0.92)",
-    landHovered: "hsla(185 88% 72% / 0.98)",
-    landSelected: "hsla(45 100% 72% / 0.98)",
-    border: "hsla(0 0% 100% / 0.52)",
-    borderActive: "hsla(48 100% 85% / 0.98)",
-    healthy: "hsl(142 70% 42%)",
-    warning: "hsl(40 92% 48%)",
-    critical: "hsl(0 84% 52%)",
-    offline: "hsl(221 16% 45%)",
-    maintenance: "hsl(215 16% 56%)",
+    ocean: "#3d6d9e",
+    atmosphere: "#97d8fb",
+    land: "rgba(109, 216, 232, 0.92)",
+    landHovered: "rgba(120, 238, 247, 0.98)",
+    landSelected: "rgba(255, 216, 112, 0.98)",
+    border: "rgba(255, 255, 255, 0.52)",
+    borderActive: "rgba(255, 234, 179, 0.98)",
+    healthy: "#2fb55d",
+    warning: "#d99210",
+    critical: "#dc3c3c",
+    offline: "#667085",
+    maintenance: "#7a8797",
   });
 
   useEffect(() => {
     const root = window.getComputedStyle(document.documentElement);
     const readVar = (token: string, fallback: string) => {
       const value = root.getPropertyValue(token).trim();
-      return value ? `hsl(${value})` : fallback;
+      return normalizeCssColor(value ? `hsl(${value})` : fallback, fallback);
     };
     setPalette({
-      ocean: readVar("--secondary", "hsl(212 48% 36%)"),
-      atmosphere: readVar("--accent", "hsl(203 92% 78%)"),
-      land: "hsla(193 72% 68% / 0.92)",
-      landHovered: "hsla(185 88% 72% / 0.98)",
-      landSelected: "hsla(45 100% 72% / 0.98)",
-      border: "hsla(0 0% 100% / 0.52)",
-      borderActive: "hsla(48 100% 85% / 0.98)",
-      healthy: readVar("--healthy", "hsl(142 70% 42%)"),
-      warning: readVar("--warning", "hsl(40 92% 48%)"),
-      critical: readVar("--critical", "hsl(0 84% 52%)"),
-      offline: readVar("--offline", "hsl(221 16% 45%)"),
-      maintenance: readVar("--muted-foreground", "hsl(215 16% 56%)"),
+      ocean: readVar("--secondary", "#3d6d9e"),
+      atmosphere: readVar("--accent", "#97d8fb"),
+      land: "rgba(109, 216, 232, 0.92)",
+      landHovered: "rgba(120, 238, 247, 0.98)",
+      landSelected: "rgba(255, 216, 112, 0.98)",
+      border: "rgba(255, 255, 255, 0.52)",
+      borderActive: "rgba(255, 234, 179, 0.98)",
+      healthy: readVar("--healthy", "#2fb55d"),
+      warning: readVar("--warning", "#d99210"),
+      critical: readVar("--critical", "#dc3c3c"),
+      offline: readVar("--offline", "#667085"),
+      maintenance: readVar("--muted-foreground", "#7a8797"),
     });
   }, []);
 
@@ -168,6 +182,8 @@ export function InfrastructureGlobe({
       sourceKind: countryData.diagnostics.sourceKind,
       totalFeatures: countryData.diagnostics.totalFeatures,
       polygonCount: countryData.diagnostics.polygonFeatures,
+      totalPoints: countryData.diagnostics.totalPoints,
+      renderedPoints: countryData.diagnostics.renderedPoints,
       firstFeature: countryData.diagnostics.firstFeature,
     });
   }, [countryData]);
@@ -339,9 +355,9 @@ export function InfrastructureGlobe({
           polygonsData={countries}
           polygonsTransitionDuration={0}
           polygonCapColor={polygonCapColor}
-          polygonSideColor={() => "hsla(197 78% 38% / 0.9)"}
+          polygonSideColor={() => "rgba(16, 92, 115, 0.9)"}
           polygonStrokeColor={polygonStrokeColor}
-          polygonResolution={4}
+          polygonCapCurvatureResolution={8}
           polygonAltitude={polygonAltitude}
           polygonLabel={null}
           onPolygonHover={onPolygonHover}
@@ -374,13 +390,13 @@ export function InfrastructureGlobe({
             <div>
               <div className="font-medium">Country polygon data failed to load.</div>
               <div className="mt-1 text-[11px] text-muted-foreground">
-                Source: {countryData.diagnostics.sourceKind}. Total features: {countryData.diagnostics.totalFeatures}.
+                Source: {countryData.diagnostics.sourceKind}. Total features: {countryData.diagnostics.totalFeatures}. Rendered points: {countryData.diagnostics.renderedPoints}.
               </div>
             </div>
           </div>
         ) : (
           <div className="absolute left-3 top-3 z-20 rounded-md border border-border/70 bg-background/85 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
-            Polygons: <span className="font-medium text-foreground">{countryCount}</span> · Shape: <span className="font-medium text-foreground">{countryData.diagnostics.sourceKind}</span>
+            Polygons: <span className="font-medium text-foreground">{countryCount}</span> · Points: <span className="font-medium text-foreground">{countryData.diagnostics.renderedPoints}</span>
           </div>
         )}
 

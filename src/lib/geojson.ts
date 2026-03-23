@@ -20,12 +20,85 @@ export type NormalizedGeoJsonResult = {
     sourceKind: "feature_collection" | "feature_array" | "invalid";
     totalFeatures: number;
     polygonFeatures: number;
+    totalPoints: number;
+    renderedPoints: number;
     firstFeature: GeoJsonFeature | null;
   };
 };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function countRingPoints(ring: unknown) {
+  return Array.isArray(ring) ? ring.length : 0;
+}
+
+function countGeometryPoints(geometry: GeoJsonFeature["geometry"]) {
+  if (!isRecord(geometry) || !Array.isArray(geometry.coordinates)) return 0;
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates.reduce((sum, ring) => sum + countRingPoints(ring), 0);
+  }
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.reduce((sum, polygon) => {
+      if (!Array.isArray(polygon)) return sum;
+      return sum + polygon.reduce((polygonSum, ring) => polygonSum + countRingPoints(ring), 0);
+    }, 0);
+  }
+  return 0;
+}
+
+function simplifyRing(ring: unknown, maxPoints: number) {
+  if (!Array.isArray(ring) || ring.length <= 4) return ring;
+
+  const firstPoint = ring[0];
+  const lastPoint = ring[ring.length - 1];
+  const isClosed =
+    Array.isArray(firstPoint) &&
+    Array.isArray(lastPoint) &&
+    firstPoint[0] === lastPoint[0] &&
+    firstPoint[1] === lastPoint[1];
+
+  const coreRing = isClosed ? ring.slice(0, -1) : ring.slice();
+  if (coreRing.length <= maxPoints) return isClosed ? [...coreRing, coreRing[0]] : coreRing;
+
+  const stride = Math.ceil(coreRing.length / maxPoints);
+  const simplified = coreRing.filter((_, index) => index === 0 || index === coreRing.length - 1 || index % stride === 0);
+
+  if (simplified.length < 3 && coreRing.length >= 3) {
+    simplified.push(coreRing[Math.floor(coreRing.length / 2)]);
+  }
+
+  return isClosed ? [...simplified, simplified[0]] : simplified;
+}
+
+function simplifyGeometry(feature: GeoJsonFeature) {
+  const geometry = feature.geometry;
+  if (!isRecord(geometry) || !Array.isArray(geometry.coordinates)) return feature;
+
+  if (geometry.type === "Polygon") {
+    return {
+      ...feature,
+      geometry: {
+        ...geometry,
+        coordinates: geometry.coordinates.map((ring, index) => simplifyRing(ring, index === 0 ? 160 : 80)),
+      },
+    };
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return {
+      ...feature,
+      geometry: {
+        ...geometry,
+        coordinates: geometry.coordinates.map((polygon) =>
+          Array.isArray(polygon) ? polygon.map((ring, index) => simplifyRing(ring, index === 0 ? 140 : 70)) : polygon,
+        ),
+      },
+    };
+  }
+
+  return feature;
 }
 
 export function normalizeGeoJsonFeatures(source: unknown): NormalizedGeoJsonResult {
@@ -47,13 +120,19 @@ export function normalizeGeoJsonFeatures(source: unknown): NormalizedGeoJsonResu
     return geometryType === "Polygon" || geometryType === "MultiPolygon";
   });
 
+  const simplifiedFeatures = polygonFeatures.map(simplifyGeometry);
+  const totalPoints = polygonFeatures.reduce((sum, feature) => sum + countGeometryPoints(feature.geometry), 0);
+  const renderedPoints = simplifiedFeatures.reduce((sum, feature) => sum + countGeometryPoints(feature.geometry), 0);
+
   return {
-    features: polygonFeatures,
+    features: simplifiedFeatures,
     diagnostics: {
       sourceKind,
       totalFeatures: rawFeatures.length,
       polygonFeatures: polygonFeatures.length,
-      firstFeature: polygonFeatures[0] ?? null,
+      totalPoints,
+      renderedPoints,
+      firstFeature: simplifiedFeatures[0] ?? null,
     },
   };
 }
