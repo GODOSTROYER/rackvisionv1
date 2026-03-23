@@ -29,8 +29,10 @@ export function DeviceInspector({ summary }: { summary: InspectorSummary }) {
       <MetricRow label="Power State" value={device.powerState} />
       <MetricRow label="Alert Count" value={String(device.alertCount)} />
       <QuickActionButtons
-        onOpenSystem={() => navigate(`/systems/${device.id}`)}
-        onAction={(action) => toast({ title: action, description: "UI-only RackVision device action." })}
+        onOpenSystem={() => navigate(`/systems/${device.id}?back=${encodeURIComponent(`/dashboard/rackvision/rack/${device.rackId}`)}`)}
+        onAction={(action) => {
+          toast({ title: action, description: "UI-only RackVision device action." });
+        }}
       />
     </div>
   );

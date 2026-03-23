@@ -1,0 +1,53 @@
+import { EntityIcon } from "@/components/rackvision/EntityIcon";
+import { NoResultsState } from "@/components/rackvision/NoResultsState";
+import { RackVisionSearchResult } from "@/components/rackvision/types";
+import { cn } from "@/lib/utils";
+
+type SearchResultsPanelProps = {
+  query: string;
+  results: RackVisionSearchResult[];
+  onSelect: (result: RackVisionSearchResult) => void;
+};
+
+export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPanelProps) {
+  if (!query.trim()) return null;
+  if (!results.length) {
+    return <NoResultsState title="No entities found" description="Search by site, rack, hostname, or IP address." />;
+  }
+
+  const groups = results.reduce<Record<string, RackVisionSearchResult[]>>((acc, item) => {
+    acc[item.group] = [...(acc[item.group] ?? []), item];
+    return acc;
+  }, {});
+
+  return (
+    <div className="max-h-[340px] overflow-auto rounded-lg border border-border bg-card p-2 shadow-sm">
+      <div className="space-y-2">
+        {Object.entries(groups).map(([group, groupItems]) => (
+          <div key={group}>
+            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
+            <div className="space-y-1">
+              {groupItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition",
+                    "hover:border-border hover:bg-muted/30",
+                  )}
+                >
+                  <EntityIcon kind={item.kind} className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium text-foreground">{item.name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{item.subtitle}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

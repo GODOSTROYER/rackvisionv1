@@ -20,6 +20,7 @@ import ServerAdminPage from "@/pages/ServerAdminPage";
 import ConfigurationPage from "@/pages/ConfigurationPage";
 import AccountPage from "@/pages/AccountPage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import SystemDetailsPage from "@/pages/SystemDetailsPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -41,7 +42,7 @@ const App = () => (
             <Route path="dashboard/rackvision/rack/:rackId" element={<RackVisionPage />} />
             <Route path="client-portal" element={<ClientPortalPage />} />
             <Route path="systems" element={<SystemsPage />} />
-            <Route path="systems/:systemId" element={<SystemsPage />} />
+            <Route path="systems/:systemId" element={<SystemDetailsPage />} />
             <Route path="networks" element={<NetworksPage />} />
             <Route path="automation" element={<AutomationPage />} />
             <Route path="reporting" element={<ReportingPage />} />

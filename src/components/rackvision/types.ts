@@ -83,7 +83,7 @@ export type BreadcrumbItem = {
 };
 
 export type RackVisionState = {
-  activeView: RackVisionView;
+  activeView: RackVisionViewMode;
   selectedEntityId: string | null;
   selectedEntityKind: RackVisionEntityKind | null;
   inspectorEntityId: string | null;
@@ -110,7 +110,41 @@ export type RackVisionState = {
   statusFilter: HealthStatus | "all";
   deviceTypeFilter: DeviceType | "all";
   breadcrumbs: BreadcrumbItem[];
+  globalSearchQuery: string;
+  globalSearchResults: RackVisionSearchResult[];
+  isSearchResultsOpen: boolean;
+  activeFilters: RackVisionActiveFilters;
+  layoutContext: {
+    siteId: string | null;
+    roomId: string | null;
+  };
+  lastRackVisionContext: {
+    entityId: string | null;
+    view: RackVisionViewMode;
+    rackId: string | null;
+  } | null;
   isLoading: boolean;
+};
+
+export type RackVisionSearchResult = {
+  id: string;
+  name: string;
+  kind: RackVisionEntityKind;
+  subtitle: string;
+  group: "Regions" | "Sites" | "Rooms" | "Rows" | "Racks" | "Devices";
+};
+
+export type RackVisionActiveFilters = {
+  status: HealthStatus | "all";
+  deviceType: DeviceType | "all";
+  criticalOnly: boolean;
+  offlineOnly: boolean;
+  regionId: string | "all";
+  siteId: string | "all";
+  roomId: string | "all";
+  rowId: string | "all";
+  alertSeverity: "all" | "warning" | "critical";
+  occupancyRange: "all" | "low" | "medium" | "high";
 };
 
 export type RackFilters = {
@@ -129,7 +163,7 @@ export type RackDeviceFilter = {
 };
 
 export type RackVisionAction =
-  | { type: "SET_ACTIVE_VIEW"; payload: RackVisionView }
+  | { type: "SET_ACTIVE_VIEW"; payload: RackVisionViewMode }
   | { type: "SELECT_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ENTITY"; payload: { id: string | null; kind: RackVisionEntityKind | null } }
   | { type: "SET_SELECTED_ROOM"; payload: string | null }
@@ -161,6 +195,17 @@ export type RackVisionAction =
   | { type: "SET_STATUS_FILTER"; payload: HealthStatus | "all" }
   | { type: "SET_DEVICE_TYPE_FILTER"; payload: DeviceType | "all" }
   | { type: "SET_BREADCRUMBS"; payload: BreadcrumbItem[] }
+  | { type: "SET_GLOBAL_SEARCH_QUERY"; payload: string }
+  | { type: "SET_GLOBAL_SEARCH_RESULTS"; payload: RackVisionSearchResult[] }
+  | { type: "OPEN_SEARCH_RESULTS" }
+  | { type: "CLOSE_SEARCH_RESULTS" }
+  | { type: "SET_ACTIVE_FILTERS"; payload: RackVisionActiveFilters }
+  | { type: "CLEAR_ACTIVE_FILTERS" }
+  | { type: "SET_LAYOUT_CONTEXT"; payload: { siteId: string | null; roomId: string | null } }
+  | {
+      type: "SET_LAST_RACKVISION_CONTEXT";
+      payload: { entityId: string | null; view: RackVisionViewMode; rackId: string | null } | null;
+    }
   | { type: "SET_LOADING"; payload: boolean };
 
 export type HierarchyNode = {
@@ -311,3 +356,63 @@ export type GlobeMarker = {
 };
 
 export type InspectorKind = Extract<RackVisionEntityKind, "region" | "site" | "room" | "row" | "rack" | "device">;
+
+export type LayoutRackTileModel = {
+  rackId: string;
+  rackName: string;
+  rowId: string;
+  rowName: string;
+  roomId: string;
+  roomName: string;
+  healthStatus: HealthStatus;
+  occupancyPercent: number;
+  alertCount: number;
+  deviceCount: number;
+};
+
+export type LayoutRowLaneModel = {
+  rowId: string;
+  rowName: string;
+  roomId: string;
+  healthStatus: HealthStatus;
+  occupancyPercent: number;
+  activeAlerts: number;
+  racks: LayoutRackTileModel[];
+};
+
+export type LayoutRoomPanelModel = {
+  roomId: string;
+  roomName: string;
+  healthStatus: HealthStatus;
+  rows: LayoutRowLaneModel[];
+};
+
+export type LayoutViewModel = {
+  siteId: string;
+  siteName: string;
+  regionName: string;
+  rooms: LayoutRoomPanelModel[];
+};
+
+export type SystemDetails = {
+  systemId: string;
+  hostname: string;
+  deviceType: DeviceType;
+  ipAddress: string;
+  osPlatform: string;
+  healthStatus: HealthStatus;
+  rackId: string;
+  rackName: string;
+  rowId: string;
+  rowName: string;
+  roomId: string;
+  roomName: string;
+  siteId: string;
+  siteName: string;
+  cpuUsage: number;
+  memoryUsage: number;
+  networkIo: string;
+  temperature: number;
+  uptime: string;
+  alerts: number;
+};

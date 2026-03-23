@@ -25,10 +25,14 @@ export function RackInspector({ summary }: { summary: InspectorSummary }) {
       <QuickActionButtons
         onOpenSystem={() => {
           const firstDevice = summary.children.find((child) => child.kind === "device");
-          if (firstDevice) navigate(`/systems/${firstDevice.id}`);
+          if (firstDevice && summary.entity.kind === "rack") {
+            navigate(`/systems/${firstDevice.id}?back=${encodeURIComponent(`/dashboard/rackvision/rack/${summary.entity.id}`)}`);
+          }
           else toast({ title: "No device linked", description: "Rack has no device records in mock data." });
         }}
-        onAction={(action) => toast({ title: action, description: "UI-only RackVision action." })}
+        onAction={(action) => {
+          toast({ title: action, description: "UI-only RackVision action." });
+        }}
       />
     </div>
   );

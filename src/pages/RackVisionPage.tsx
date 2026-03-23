@@ -5,11 +5,24 @@ import { FilterBarPlaceholder } from "@/components/rackvision/FilterBarPlacehold
 import { GlobalInfrastructureView } from "@/components/rackvision/GlobalInfrastructureView";
 import { HierarchyPanel } from "@/components/rackvision/HierarchyPanel";
 import { InspectorPanel } from "@/components/rackvision/InspectorPanel";
+import { LayoutViewCanvas } from "@/components/rackvision/LayoutViewCanvas";
 import { RackVisionHeader } from "@/components/rackvision/RackVisionHeader";
+import { RackVisionViewModeSwitcher } from "@/components/rackvision/RackVisionViewModeSwitcher";
 import { RackVisionProvider, useRackVision } from "@/components/rackvision/RackVisionContext";
-import { ViewModeSwitchPlaceholder } from "@/components/rackvision/ViewModeSwitchPlaceholder";
+import { RouteFallbackState } from "@/components/rackvision/RouteFallbackState";
+import { SiteOverviewCanvas } from "@/components/rackvision/SiteOverviewCanvas";
 import { InspectorSummary } from "@/components/rackvision/inspector-types";
-import { GlobalSummary, GlobeMarker, HierarchyNode, RackVisionEntityKind, Region, RegionSummary, SiteSummary } from "@/components/rackvision/types";
+import {
+  GlobalSummary,
+  GlobeMarker,
+  HierarchyNode,
+  RackVisionEntityKind,
+  RackVisionSearchResult,
+  RackVisionViewMode,
+  Region,
+  RegionSummary,
+  SiteSummary,
+} from "@/components/rackvision/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { MockDataService } from "@/services/rackvision/MockDataService";
@@ -62,9 +75,16 @@ function RackVisionWorkspace() {
     const roomCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "room");
     const rowCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "row");
     const rackCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "rack");
+    const deviceCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "device");
     dispatch({ type: "SET_SELECTED_ROOM", payload: roomCrumb?.id ?? null });
     dispatch({ type: "SET_SELECTED_ROW", payload: rowCrumb?.id ?? null });
     dispatch({ type: "SET_SELECTED_RACK", payload: rackCrumb?.id ?? null });
+    dispatch({ type: "SET_SELECTED_DEVICE", payload: deviceCrumb?.id ?? null });
+    dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: breadcrumbs.find((crumb) => crumb.kind === "site")?.id ?? null, roomId: roomCrumb?.id ?? null } });
+    dispatch({
+      type: "SET_LAST_RACKVISION_CONTEXT",
+      payload: { entityId: id, view: state.activeView, rackId: rackCrumb?.id ?? null },
+    });
     if (kind !== "rack") dispatch({ type: "CLOSE_RACK_PREVIEW" });
 
     const regionCrumb = [...breadcrumbs].reverse().find((crumb) => crumb.kind === "region");
@@ -102,11 +122,34 @@ function RackVisionWorkspace() {
       const { regionMarkers, siteMarkers } = await MockDataService.getMarkerData(
         state.globalViewMode === "sites" && selectedRegionId ? selectedRegionId : undefined,
       );
-      setMarkers(state.globalViewMode === "regions" ? regionMarkers : siteMarkers);
+      const visible = (state.globalViewMode === "regions" ? regionMarkers : siteMarkers).filter((marker) => {
+        if (state.activeFilters.status !== "all" && marker.healthStatus !== state.activeFilters.status) return false;
+        if (state.activeFilters.offlineOnly && marker.healthStatus !== "Offline") return false;
+        if (state.activeFilters.criticalOnly && marker.healthStatus !== "Critical") return false;
+        return true;
+      });
+      setMarkers(visible);
       setGlobalLoading(false);
     };
     loadGlobal();
-  }, [selectedRegionId, state.globalViewMode]);
+  }, [selectedRegionId, state.globalViewMode, state.activeFilters.criticalOnly, state.activeFilters.offlineOnly, state.activeFilters.status]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      if (!state.globalSearchQuery.trim()) {
+        dispatch({ type: "SET_GLOBAL_SEARCH_RESULTS", payload: [] });
+        return;
+      }
+      const [results, filtered] = await Promise.all([
+        MockDataService.searchRackVision(state.globalSearchQuery),
+        MockDataService.getFilteredEntities(state.activeFilters),
+      ]);
+      const allowedIds = new Set(filtered.map((entity) => entity.id));
+      dispatch({ type: "SET_GLOBAL_SEARCH_RESULTS", payload: results.filter((item) => allowedIds.has(item.id)) });
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [dispatch, state.activeFilters, state.globalSearchQuery]);
 
   useEffect(() => {
     if (!state.inspectorEntityId) {
@@ -162,10 +205,37 @@ function RackVisionWorkspace() {
     await selectEntity(entityId);
   };
 
+  const handleSearchResultSelect = async (result: RackVisionSearchResult) => {
+    await selectEntity(result.id, result.kind);
+    dispatch({ type: "CLOSE_SEARCH_RESULTS" });
+    dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: result.name });
+    if (result.kind === "region") dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
+    if (result.kind === "site" || result.kind === "room" || result.kind === "row") dispatch({ type: "SET_ACTIVE_VIEW", payload: "site" });
+    if (result.kind === "rack") {
+      dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
+      dispatch({ type: "OPEN_RACK_PREVIEW", payload: result.id });
+    }
+    if (result.kind === "device") {
+      const context = await MockDataService.getEntityContext(result.id);
+      const rackId = context?.rackId;
+      if (rackId) dispatch({ type: "OPEN_RACK_PREVIEW", payload: rackId });
+      dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
+    }
+  };
+
   const handleOpenDevice = async (deviceId: string) => {
     await selectEntity(deviceId, "device");
+    dispatch({
+      type: "SET_LAST_RACKVISION_CONTEXT",
+      payload: {
+        entityId: state.selectedEntityId,
+        view: state.activeView,
+        rackId: state.selectedRackId,
+      },
+    });
     toast({ title: "Open System Details", description: "Navigating to system details placeholder." });
-    navigate(`/systems/${deviceId}`);
+    const backRoute = state.selectedRackId ? `/dashboard/rackvision/rack/${state.selectedRackId}` : "/dashboard/rackvision";
+    navigate(`/systems/${deviceId}?back=${encodeURIComponent(backRoute)}&entityId=${state.selectedEntityId ?? ""}`);
   };
 
   const handleBreadcrumbSelect = async (id: string) => {
@@ -177,6 +247,7 @@ function RackVisionWorkspace() {
       dispatch({ type: "SET_SELECTED_ROOM", payload: null });
       dispatch({ type: "SET_SELECTED_ROW", payload: null });
       dispatch({ type: "SET_SELECTED_RACK", payload: null });
+      dispatch({ type: "SET_SELECTED_DEVICE", payload: null });
       dispatch({ type: "CLOSE_RACK_PREVIEW" });
       dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
       return;
@@ -186,18 +257,113 @@ function RackVisionWorkspace() {
 
   const handleOpenRack = async (rackId: string) => {
     dispatch({ type: "OPEN_RACK_PREVIEW", payload: rackId });
+    dispatch({ type: "SET_ACTIVE_VIEW", payload: "rack" });
     await selectEntity(rackId, "rack");
     navigate(`/dashboard/rackvision/rack/${rackId}`);
+  };
+
+  const renderCenter = () => {
+    if (state.activeView === "layout") {
+      return (
+        <LayoutViewCanvas
+          selectedEntityId={state.selectedEntityId}
+          selectedEntityKind={state.selectedEntityKind}
+          selectedSiteId={selectedSiteId}
+          selectedRoomId={state.selectedRoomId}
+          selectedRackId={state.selectedRackId}
+          onSelectEntity={handleEntitySelect}
+          onOpenRack={handleOpenRack}
+        />
+      );
+    }
+
+    if (state.activeView === "site") {
+      return (
+        <SiteOverviewCanvas
+          selectedEntityId={state.selectedEntityId}
+          selectedEntityKind={state.selectedEntityKind}
+          selectedRegionId={selectedRegionId}
+          selectedSiteId={selectedSiteId}
+          selectedEntityName={selectedEntityName}
+          onSelectEntity={handleEntitySelect}
+          onOpenRack={handleOpenRack}
+          onOpenDevice={handleOpenDevice}
+        />
+      );
+    }
+
+    if (state.activeView === "rack") {
+      const hasRackContext = Boolean(state.selectedRackId || state.rackPreviewRackId || state.selectedEntityKind === "rack" || state.selectedEntityKind === "device");
+      if (!hasRackContext) {
+        return <RouteFallbackState title="Rack View needs a selected rack" description="Select any rack from hierarchy, search, site cards, or layout tiles to continue." />;
+      }
+      return (
+        <SiteOverviewCanvas
+          selectedEntityId={state.selectedEntityId}
+          selectedEntityKind={state.selectedEntityKind}
+          selectedRegionId={selectedRegionId}
+          selectedSiteId={selectedSiteId}
+          selectedEntityName={selectedEntityName}
+          onSelectEntity={handleEntitySelect}
+          onOpenRack={handleOpenRack}
+          onOpenDevice={handleOpenDevice}
+        />
+      );
+    }
+
+    if (state.activeView === "hierarchy") {
+      return (
+        <RouteFallbackState
+          title="Hierarchy focus mode"
+          description="Use the left panel to navigate entities; inspector and breadcrumbs remain fully synchronized while canvas stays low-noise."
+        />
+      );
+    }
+
+    return (
+      <GlobalInfrastructureView
+        forceGlobalView
+        loading={globalLoading}
+        summary={globalSummary}
+        markers={markers}
+        selectedEntityId={state.selectedEntityId}
+        selectedEntityKind={state.selectedEntityKind}
+        selectedRegionId={selectedRegionId}
+        selectedSiteId={selectedSiteId}
+        selectedEntityName={selectedEntityName}
+        selectedMarkerId={state.selectedMarkerId ?? state.selectedEntityId}
+        hoveredMarkerId={state.hoveredEntityId}
+        regionSummary={regionSummary}
+        siteSummary={siteSummary}
+        regionLookup={regionLookup}
+        onHoverMarker={(id) => dispatch({ type: "SET_HOVERED_ENTITY", payload: id })}
+        onSelectMarker={async (id) => {
+          dispatch({ type: "SET_SELECTED_MARKER", payload: id });
+          await handleEntitySelect(id);
+        }}
+        onSelectEntity={handleEntitySelect}
+        onOpenRack={handleOpenRack}
+        onOpenDevice={handleOpenDevice}
+        globalViewMode={state.globalViewMode}
+        onGlobalViewModeChange={(mode) => dispatch({ type: "SET_GLOBAL_VIEW_MODE", payload: mode })}
+      />
+    );
   };
 
   return (
     <section className="space-y-4">
       <RackVisionHeader
-        searchQuery={state.searchQuery}
+        searchQuery={state.globalSearchQuery}
+        searchResults={state.globalSearchResults}
+        isSearchOpen={state.isSearchResultsOpen}
+        onSearchOpenChange={(open) => dispatch({ type: open ? "OPEN_SEARCH_RESULTS" : "CLOSE_SEARCH_RESULTS" })}
         onSearchQueryChange={(value) => {
+          dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: value });
+          if (!state.isSearchResultsOpen) dispatch({ type: "OPEN_SEARCH_RESULTS" });
           dispatch({ type: "SET_TREE_SEARCH", payload: value });
           handleSearch(value);
         }}
+        onSearchResultSelect={handleSearchResultSelect}
         regionId={selectedRegionId}
         siteId={selectedSiteId}
         regions={regions}
@@ -212,7 +378,7 @@ function RackVisionWorkspace() {
         }}
       />
 
-      <ViewModeSwitchPlaceholder />
+      <RackVisionViewModeSwitcher />
       <FilterBarPlaceholder />
       <BreadcrumbBar onSelectBreadcrumb={handleBreadcrumbSelect} />
 
@@ -225,31 +391,7 @@ function RackVisionWorkspace() {
       ) : (
         <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
           <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
-          <GlobalInfrastructureView
-            loading={globalLoading}
-            summary={globalSummary}
-            markers={markers}
-            selectedEntityId={state.selectedEntityId}
-            selectedEntityKind={state.selectedEntityKind}
-            selectedRegionId={selectedRegionId}
-            selectedSiteId={selectedSiteId}
-            selectedEntityName={selectedEntityName}
-            selectedMarkerId={state.selectedMarkerId ?? state.selectedEntityId}
-            hoveredMarkerId={state.hoveredEntityId}
-            regionSummary={regionSummary}
-            siteSummary={siteSummary}
-            regionLookup={regionLookup}
-            onHoverMarker={(id) => dispatch({ type: "SET_HOVERED_ENTITY", payload: id })}
-            onSelectMarker={async (id) => {
-              dispatch({ type: "SET_SELECTED_MARKER", payload: id });
-              await handleEntitySelect(id);
-            }}
-            onSelectEntity={handleEntitySelect}
-            onOpenRack={handleOpenRack}
-            onOpenDevice={handleOpenDevice}
-            globalViewMode={state.globalViewMode}
-            onGlobalViewModeChange={(mode) => dispatch({ type: "SET_GLOBAL_VIEW_MODE", payload: mode })}
-          />
+          {renderCenter()}
           <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
         </div>
       )}

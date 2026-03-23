@@ -95,10 +95,16 @@ export function SiteOverviewCanvas({
       const nextRows = state.selectedRoomId
         ? await MockDataService.getRoomRows(state.selectedRoomId)
         : await MockDataService.getRowsForSite(siteContextId);
-      setRows(nextRows);
+      const filteredRows = nextRows.filter((row) => {
+        if (state.activeFilters.status !== "all" && row.healthStatus !== state.activeFilters.status) return false;
+        if (state.activeFilters.criticalOnly && row.healthStatus !== "Critical") return false;
+        if (state.activeFilters.offlineOnly && row.healthStatus !== "Offline") return false;
+        return true;
+      });
+      setRows(filteredRows);
     };
     load();
-  }, [siteContextId, state.selectedRoomId]);
+  }, [siteContextId, state.activeFilters.criticalOnly, state.activeFilters.offlineOnly, state.activeFilters.status, state.selectedRoomId]);
 
   useEffect(() => {
     if (!siteContextId) {
@@ -108,14 +114,39 @@ export function SiteOverviewCanvas({
     const load = async () => {
       const mergedFilters = {
         ...state.rackFilters,
+        status: state.activeFilters.status,
+        occupancy: state.activeFilters.occupancyRange,
+        alertLevel:
+          state.activeFilters.alertSeverity === "critical"
+            ? "critical_only"
+            : state.activeFilters.alertSeverity === "warning"
+              ? "warning_critical"
+              : "all",
         roomId: state.selectedRoomId ?? state.rackFilters.roomId,
         rowId: state.selectedRowId ?? state.rackFilters.rowId,
-      };
+      } as const;
       const nextRacks = await MockDataService.getRacksForSite(siteContextId, mergedFilters, state.rackSortBy, state.rackSearchQuery);
-      setRacks(nextRacks);
+      const filteredRacks = nextRacks.filter((rack) => {
+        if (state.activeFilters.criticalOnly && rack.healthStatus !== "Critical") return false;
+        if (state.activeFilters.offlineOnly && rack.healthStatus !== "Offline") return false;
+        return true;
+      });
+      setRacks(filteredRacks);
     };
     load();
-  }, [siteContextId, state.rackFilters, state.rackSearchQuery, state.rackSortBy, state.selectedRoomId, state.selectedRowId]);
+  }, [
+    siteContextId,
+    state.activeFilters.alertSeverity,
+    state.activeFilters.criticalOnly,
+    state.activeFilters.offlineOnly,
+    state.activeFilters.occupancyRange,
+    state.activeFilters.status,
+    state.rackFilters,
+    state.rackSearchQuery,
+    state.rackSortBy,
+    state.selectedRoomId,
+    state.selectedRowId,
+  ]);
 
   const rackViewRackId = state.rackPreviewRackId ?? state.selectedRackId ?? (selectedEntityKind === "rack" ? selectedEntityId : null);
 

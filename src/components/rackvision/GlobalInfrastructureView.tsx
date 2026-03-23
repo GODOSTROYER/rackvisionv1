@@ -10,6 +10,7 @@ import { GlobalSummary, GlobeMarker, RackVisionEntityKind, RegionSummary, SiteSu
 import { Button } from "@/components/ui/button";
 
 type GlobalInfrastructureViewProps = {
+  forceGlobalView?: boolean;
   loading: boolean;
   summary: GlobalSummary | null;
   markers: GlobeMarker[];
@@ -33,6 +34,7 @@ type GlobalInfrastructureViewProps = {
 };
 
 export function GlobalInfrastructureView({
+  forceGlobalView = false,
   loading,
   summary,
   markers,
@@ -54,7 +56,7 @@ export function GlobalInfrastructureView({
   globalViewMode,
   onGlobalViewModeChange,
 }: GlobalInfrastructureViewProps) {
-  if (selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
+  if (!forceGlobalView && selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
     return (
       <SiteOverviewCanvas
         selectedEntityId={selectedEntityId}
