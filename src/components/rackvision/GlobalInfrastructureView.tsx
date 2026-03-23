@@ -81,13 +81,16 @@ export function GlobalInfrastructureView({
   const loadCountryContext = async (countryCode: string) => {
     setCountryLoading(true);
     setSelectedCountryCode(countryCode);
-    const [summary, sitesInCountry] = await Promise.all([
-      MockDataService.getCountryInfrastructureSummary(countryCode),
-      MockDataService.getCountrySites(countryCode),
-    ]);
-    setCountrySummary(summary);
-    setCountrySites(sitesInCountry);
-    setCountryLoading(false);
+    try {
+      const [summary, sitesInCountry] = await Promise.all([
+        MockDataService.getCountryInfrastructureSummary(countryCode),
+        MockDataService.getCountrySites(countryCode),
+      ]);
+      setCountrySummary(summary);
+      setCountrySites(sitesInCountry);
+    } finally {
+      setCountryLoading(false);
+    }
   };
 
   if (!forceGlobalView && selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
@@ -140,8 +143,6 @@ export function GlobalInfrastructureView({
         onSelectMarker={onSelectMarker}
         onSelectCountry={async (countryCode) => {
           await loadCountryContext(countryCode);
-          const firstRegionId = (await MockDataService.getCountrySites(countryCode))[0]?.site.regionId;
-          if (firstRegionId) await onSelectEntity(firstRegionId);
         }}
         regionLookup={regionLookup}
       />
