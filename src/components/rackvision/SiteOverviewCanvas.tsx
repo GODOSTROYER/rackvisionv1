@@ -124,7 +124,7 @@ export function SiteOverviewCanvas({
               : "all",
         roomId: state.selectedRoomId ?? state.rackFilters.roomId,
         rowId: state.selectedRowId ?? state.rackFilters.rowId,
-      };
+      } as const;
       const nextRacks = await MockDataService.getRacksForSite(siteContextId, mergedFilters, state.rackSortBy, state.rackSearchQuery);
       const filteredRacks = nextRacks.filter((rack) => {
         if (state.activeFilters.criticalOnly && rack.healthStatus !== "Critical") return false;
