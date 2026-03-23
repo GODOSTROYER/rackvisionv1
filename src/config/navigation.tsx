@@ -41,6 +41,7 @@ export const navGroups: NavGroup[] = [
         children: [
           { label: "View", to: "/dashboard/view" },
           { label: "Manage", to: "/dashboard/manage" },
+          { label: "RackVision", to: "/dashboard/rackvision" },
         ],
       },
       { label: "Client Portal", to: "/client-portal", icon: Users },
