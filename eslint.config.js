@@ -4,6 +4,17 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+const safeRefreshExports = [
+  "badgeVariants",
+  "buttonVariants",
+  "navigationMenuTriggerStyle",
+  "toggleVariants",
+  "toast",
+  "useFormField",
+  "useRackVision",
+  "useSidebar",
+];
+
 export default tseslint.config(
   { ignores: ["dist"] },
   {
@@ -19,7 +30,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "react-refresh/only-export-components": [
+        "warn",
+        { allowConstantExport: true, allowExportNames: safeRefreshExports },
+      ],
       "@typescript-eslint/no-unused-vars": "off",
     },
   },

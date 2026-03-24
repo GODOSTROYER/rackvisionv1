@@ -16,6 +16,7 @@ const initialState: RackVisionState = {
   hoveredEntityId: null,
   selectedMarkerId: null,
   globalViewMode: "regions",
+  globeRenderer: "three",
   expandedNodeIds: [],
   searchQuery: "",
   rackSearchQuery: "",
@@ -40,10 +41,13 @@ const initialState: RackVisionState = {
   globalSearchResults: [],
   isSearchResultsOpen: false,
   activeFilters: DEFAULT_ACTIVE_FILTERS,
+  activeFilterPresetId: "custom",
   layoutContext: {
     siteId: null,
     roomId: null,
   },
+  layoutOverlayMode: "alerts",
+  investigationHistory: [],
   isLoading: false,
 };
 
@@ -80,6 +84,8 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
       return { ...state, selectedMarkerId: action.payload };
     case "SET_GLOBAL_VIEW_MODE":
       return { ...state, globalViewMode: action.payload };
+    case "SET_GLOBE_RENDERER":
+      return { ...state, globeRenderer: action.payload };
     case "SET_INSPECTOR_ENTITY":
       return { ...state, inspectorEntityId: action.payload };
     case "SET_TREE_SEARCH":
@@ -120,14 +126,27 @@ function rackVisionReducer(state: RackVisionState, action: RackVisionAction): Ra
     case "CLOSE_SEARCH_RESULTS":
       return { ...state, isSearchResultsOpen: false };
     case "SET_ACTIVE_FILTERS":
-      return { ...state, activeFilters: action.payload };
+      return { ...state, activeFilters: action.payload, activeFilterPresetId: "custom" };
     case "CLEAR_ACTIVE_FILTERS":
       return {
         ...state,
         activeFilters: DEFAULT_ACTIVE_FILTERS,
+        activeFilterPresetId: "custom",
       };
+    case "SET_FILTER_PRESET":
+      return { ...state, activeFilterPresetId: action.payload };
     case "SET_LAYOUT_CONTEXT":
       return { ...state, layoutContext: action.payload };
+    case "SET_LAYOUT_OVERLAY_MODE":
+      return { ...state, layoutOverlayMode: action.payload };
+    case "SET_INVESTIGATION_HISTORY":
+      return { ...state, investigationHistory: action.payload };
+    case "PUSH_INVESTIGATION_HISTORY": {
+      const deduped = state.investigationHistory.filter((entry) => entry.route !== action.payload.route);
+      return { ...state, investigationHistory: [action.payload, ...deduped].slice(0, 8) };
+    }
+    case "CLEAR_INVESTIGATION_HISTORY":
+      return { ...state, investigationHistory: [] };
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
     default:

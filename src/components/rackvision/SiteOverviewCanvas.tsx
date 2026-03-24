@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Building2, MapPin } from "lucide-react";
 import { StatusBadge } from "@/components/enterprise/StatusBadge";
 import { NoRacksState } from "@/components/rackvision/NoRacksState";
@@ -16,7 +17,9 @@ import { SiteSummaryCards } from "@/components/rackvision/SiteSummaryCards";
 import { useRackVision } from "@/components/rackvision/RackVisionContext";
 import { RackSummary, RackVisionEntityKind, RowSummary, SiteCardSummary, SiteOverview } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 import { MockDataService } from "@/services/rackvision/MockDataService";
+import { OperationsMockService } from "@/services/ops/OperationsMockService";
 
 type RackPreviewData = RackSummary & {
   devices: Array<{ id: string; name: string; deviceType: string; rackUnitStart: number }>;
@@ -45,11 +48,14 @@ export function SiteOverviewCanvas({
   onOpenDevice,
 }: SiteOverviewCanvasProps) {
   const { state, dispatch } = useRackVision();
+  const navigate = useNavigate();
   const [regionSites, setRegionSites] = useState<SiteCardSummary[]>([]);
   const [overview, setOverview] = useState<SiteOverview | null>(null);
   const [rows, setRows] = useState<RowSummary[]>([]);
   const [racks, setRacks] = useState<RackSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [siteOpsVersion, setSiteOpsVersion] = useState(0);
 
   const regionMode = selectedEntityKind === "region" && selectedEntityId;
   const siteContextId = useMemo(() => {
@@ -207,6 +213,54 @@ export function SiteOverviewCanvas({
     await onOpenRack(rackId);
   };
 
+  const getSiteScope = () => siteContextId ?? overview?.site.id ?? null;
+
+  const refreshOperationalPanels = () => {
+    setSiteOpsVersion((value) => value + 1);
+  };
+
+  const handleExport = async () => {
+    const siteScope = getSiteScope();
+    if (!siteScope) return;
+    setActionBusy("export");
+    try {
+      const snapshot = await OperationsMockService.exportScopeSnapshot({ siteId: siteScope });
+      try {
+        await navigator.clipboard.writeText(snapshot);
+        toast({ title: "Snapshot copied", description: `${overview?.site.name ?? "Site"} snapshot copied to clipboard.` });
+      } catch {
+        const blob = new Blob([snapshot], { type: "application/json" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${siteScope}-rackvision-snapshot.json`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        toast({ title: "Snapshot downloaded", description: "A JSON export was generated for this site scope." });
+      }
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleRunChecks = async () => {
+    const siteScope = getSiteScope();
+    if (!siteScope) return;
+    setActionBusy("checks");
+    try {
+      const result = await OperationsMockService.runHealthCheck({ entityType: "site", entityId: siteScope });
+      toast({ title: result.title, description: result.findings[0] ?? "Health checks completed." });
+      refreshOperationalPanels();
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleViewAlerts = () => {
+    const siteScope = getSiteScope();
+    navigate(siteScope ? `/dashboard/manage?siteId=${encodeURIComponent(siteScope)}&entityName=${encodeURIComponent(overview?.site.name ?? "Site")}&source=RackVision` : "/dashboard/manage");
+  };
+
   return (
     <section className="space-y-3">
       <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
@@ -220,8 +274,15 @@ export function SiteOverviewCanvas({
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <StatusBadge status={overview.site.healthStatus} />
-            <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Snapshot</Button>
-            <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Run Checks</Button>
+            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={handleViewAlerts}>
+              View Alerts
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={handleExport} disabled={actionBusy !== null}>
+              {actionBusy === "export" ? "Exporting..." : "Snapshot"}
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={handleRunChecks} disabled={actionBusy !== null}>
+              {actionBusy === "checks" ? "Running..." : "Run Checks"}
+            </Button>
           </div>
         </div>
       </div>
@@ -233,7 +294,7 @@ export function SiteOverviewCanvas({
           <RoomExplorer rooms={overview.rooms} selectedRoomId={state.selectedRoomId} onSelectRoom={handleSelectRoom} />
           <RowExplorer rows={rows} selectedRowId={state.selectedRowId} onSelectRow={handleSelectRow} />
         </div>
-        <SiteMetadataPanel overview={overview} />
+        <SiteMetadataPanel overview={overview} refreshKey={siteOpsVersion} />
       </div>
 
       <div className="space-y-2 rounded-xl border border-border bg-card p-3 shadow-sm">

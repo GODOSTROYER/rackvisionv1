@@ -47,7 +47,7 @@ export function RackDeviceBlock({ item, selected, onSelect, onHover, onOpenSyste
           type="button"
           style={{ gridRow: `${gridRowStart} / span ${gridRowSpan}` }}
           className={cn(
-            "relative z-10 m-0.5 flex h-[calc(100%-4px)] min-h-0 flex-col overflow-hidden rounded border px-2 py-1 text-left transition",
+            "relative z-10 m-0.5 flex h-[calc(100%-4px)] min-h-0 flex-col overflow-hidden rounded border px-2 py-1 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             typeTone[device.deviceType] ?? "bg-card",
             selected ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/60",
           )}
@@ -55,7 +55,26 @@ export function RackDeviceBlock({ item, selected, onSelect, onHover, onOpenSyste
           onDoubleClick={() => onOpenSystem(device.id)}
           onMouseEnter={() => onHover(device.id)}
           onMouseLeave={() => onHover(null)}
+          onFocus={() => onHover(device.id)}
+          onBlur={() => onHover(null)}
+          onKeyDown={(event) => {
+            if (event.key === " " || event.key === "Enter") {
+              event.preventDefault();
+              onSelect(device.id);
+            }
+
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+              event.preventDefault();
+              onOpenSystem(device.id);
+            }
+
+            if (event.key === "Enter" && selected) {
+              event.preventDefault();
+              onOpenSystem(device.id);
+            }
+          }}
           aria-label={`${device.name} in ${rackUnitLabel}`}
+          aria-pressed={selected}
         >
           <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="min-w-0">

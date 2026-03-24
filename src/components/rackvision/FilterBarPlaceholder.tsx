@@ -1,24 +1,43 @@
-import { SlidersHorizontal } from "lucide-react";
+import { BookmarkCheck, SlidersHorizontal } from "lucide-react";
 import { ActiveFilterChips } from "@/components/rackvision/ActiveFilterChips";
 import { useRackVision } from "@/components/rackvision/RackVisionContext";
+import { RACKVISION_FILTER_PRESETS, RackVisionFilterPresetId } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function FilterBarPlaceholder() {
+export function FilterBar() {
   const { state, dispatch } = useRackVision();
 
-  const updateFilters = (next: typeof state.activeFilters) => {
+  const updateFilters = (next: typeof state.activeFilters, presetId: RackVisionFilterPresetId = "custom") => {
     dispatch({ type: "SET_ACTIVE_FILTERS", payload: next });
+    dispatch({ type: "SET_FILTER_PRESET", payload: presetId });
     dispatch({ type: "SET_HIGHLIGHT_CRITICAL_ONLY", payload: next.criticalOnly });
   };
 
   const clearAll = () => {
     dispatch({ type: "CLEAR_ACTIVE_FILTERS" });
+    dispatch({ type: "SET_FILTER_PRESET", payload: "custom" });
     dispatch({ type: "SET_HIGHLIGHT_CRITICAL_ONLY", payload: false });
   };
 
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card p-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-muted/20 p-2">
+        <div className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <BookmarkCheck className="h-3.5 w-3.5" /> Saved Views
+        </div>
+        {RACKVISION_FILTER_PRESETS.map((preset) => (
+          <Button
+            key={preset.id}
+            size="sm"
+            variant={state.activeFilterPresetId === preset.id ? "default" : "outline"}
+            className="h-8"
+            onClick={() => updateFilters({ ...preset.filters }, preset.id)}
+          >
+            {preset.label}
+          </Button>
+        ))}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex w-full items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground sm:w-auto">
           <SlidersHorizontal className="h-3.5 w-3.5" /> RackVision Filters
@@ -113,3 +132,5 @@ export function FilterBarPlaceholder() {
     </div>
   );
 }
+
+export const FilterBarPlaceholder = FilterBar;

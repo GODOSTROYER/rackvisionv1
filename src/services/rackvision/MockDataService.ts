@@ -1608,6 +1608,7 @@ function mapToSearchResult(entity: RackVisionEntity): RackVisionSearchResult {
 
 function buildLayoutRackTile(rack: Rack): LayoutRackTileModel {
   const summary = getRackSummarySync(rack.id);
+  const metric = rackMetrics[rack.id];
   return {
     rackId: rack.id,
     rackName: rack.name,
@@ -1619,6 +1620,14 @@ function buildLayoutRackTile(rack: Rack): LayoutRackTileModel {
     occupancyPercent: rack.occupancyPercent,
     alertCount: summary?.alertCount ?? 0,
     deviceCount: summary?.deviceCount ?? 0,
+    avgTemperature: summary?.avgTemperature ?? 0,
+    powerDrawKw: metric?.powerLoadKw ?? 0,
+    hotspotRisk:
+      metric?.temperatureState === "Hot Zone"
+        ? "High"
+        : metric?.temperatureState === "Elevated" || metric?.temperatureState === "Slightly Elevated"
+          ? "Medium"
+          : "Low",
   };
 }
 
@@ -1641,6 +1650,14 @@ function getLayoutViewModelSync(scopeId: string): LayoutViewModel | null {
         healthStatus: row.healthStatus,
         occupancyPercent: summary?.occupancyPercent ?? 0,
         activeAlerts: summary?.activeAlerts ?? 0,
+        avgTemperature: summary?.avgTemperature ?? 0,
+        powerDrawKw: summary?.powerLoadKw ?? 0,
+        hotspotRisk:
+          row.healthStatus === "Critical"
+            ? "High"
+            : row.healthStatus === "Warning"
+              ? "Medium"
+              : "Low",
         racks: rowRacks.map(buildLayoutRackTile),
       };
     });
@@ -1716,6 +1733,39 @@ function getFilteredEntitiesSync(filters: RackVisionActiveFilters) {
     if (filters.offlineOnly && entity.healthStatus !== "Offline") return false;
     if (filters.criticalOnly && entity.healthStatus !== "Critical") return false;
     if (filters.deviceType !== "all" && entity.kind === "device" && entity.deviceType !== filters.deviceType) return false;
+    if (filters.alertSeverity !== "all") {
+      const alertCount =
+        entity.kind === "device"
+          ? entity.alertCount
+          : entity.kind === "rack"
+            ? getRackSummarySync(entity.id)?.alertCount ?? 0
+            : entity.kind === "site"
+              ? getSiteSummarySync(entity.id)?.activeAlerts ?? 0
+              : entity.kind === "row"
+                ? getRowSummarySync(entity.id)?.activeAlerts ?? 0
+                : entity.kind === "room"
+                  ? getRoomSummarySync(entity.id)?.alertCount ?? 0
+                  : entity.kind === "region"
+                    ? getRegionSummarySync(entity.id)?.activeAlerts ?? 0
+                    : 0;
+      if (filters.alertSeverity === "warning" && alertCount === 0) return false;
+      if (filters.alertSeverity === "critical" && entity.healthStatus !== "Critical") return false;
+    }
+    if (filters.occupancyRange !== "all") {
+      const occupancy =
+        entity.kind === "rack"
+          ? entity.occupancyPercent
+          : entity.kind === "site"
+            ? getSiteSummarySync(entity.id)?.occupancyPercent ?? 0
+            : entity.kind === "row"
+              ? getRowSummarySync(entity.id)?.occupancyPercent ?? 0
+              : entity.kind === "device"
+                ? getRackSummarySync(entity.rackId)?.occupancyPercent ?? 0
+                : 0;
+      if (filters.occupancyRange === "low" && occupancy >= 50) return false;
+      if (filters.occupancyRange === "medium" && (occupancy < 50 || occupancy > 79)) return false;
+      if (filters.occupancyRange === "high" && occupancy < 80) return false;
+    }
     if (filters.regionId !== "all") {
       const region = getRegionForEntity(entity);
       if (!region || region.id !== filters.regionId) return false;

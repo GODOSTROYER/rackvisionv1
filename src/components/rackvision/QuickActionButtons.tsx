@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { AlertTriangle, PlugZap, Power, Wrench } from "lucide-react";
-import { runActionToast } from "@/components/rackvision/ActionToast";
 import { Button } from "@/components/ui/button";
 
 type QuickActionButtonsProps = {
@@ -13,9 +12,11 @@ export function QuickActionButtons({ onOpenSystem, onAction }: QuickActionButton
 
   const handleAction = async (action: string) => {
     setPendingAction(action);
-    await runActionToast(action);
-    await onAction(action);
-    setPendingAction(null);
+    try {
+      await onAction(action);
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   return (

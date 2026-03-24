@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, KeyRound, Map } from "lucide-react";
+import mapboxgl, { type GeoJSONSource as MapboxGeoJsonSource, type Map as MapboxMap, type MapLayerMouseEvent } from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { EntityHoverSummaryCard } from "@/components/rackvision/EntityHoverSummaryCard";
 import {
   buildStatusTone,
@@ -25,10 +27,6 @@ type MapboxInfrastructureGlobeProps = {
   onSelectCountry?: (countryCode: string) => void;
   regionLookup: Record<string, string>;
 };
-
-type MapboxModule = typeof import("mapbox-gl");
-type MapboxMap = import("mapbox-gl").Map;
-type MapboxGeoJsonSource = import("mapbox-gl").GeoJSONSource;
 
 type CountryFeature = GeoJsonFeature;
 
@@ -240,6 +238,25 @@ export function MapboxInfrastructureGlobe({
     [countriesCollection, hoveredCountry?.code, selectedCountryCode],
   );
   const statusTone = useMemo(() => buildStatusTone(palette), [palette]);
+  const mapSetupStateRef = useRef({
+    countriesCollection,
+    activeCountryCollection,
+    markersCollection,
+    palette,
+    statusTone,
+    selectedCountryCode,
+    selectedMarkerId,
+  });
+
+  mapSetupStateRef.current = {
+    countriesCollection,
+    activeCountryCollection,
+    markersCollection,
+    palette,
+    statusTone,
+    selectedCountryCode,
+    selectedMarkerId,
+  };
 
   useEffect(() => {
     setPalette(buildThemePalette());
@@ -282,17 +299,15 @@ export function MapboxInfrastructureGlobe({
     let isMounted = true;
     let mapInstance: MapboxMap | null = null;
 
-    async function initializeMap(): Promise<void> {
+    function initializeMap(): void {
       try {
-        const mapboxModule = (await import("mapbox-gl")) as MapboxModule;
-
         if (!isMounted || !containerRef.current) {
           return;
         }
 
-        mapboxModule.default.accessToken = MAPBOX_ACCESS_TOKEN;
+        mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
-        mapInstance = new mapboxModule.default.Map({
+        mapInstance = new mapboxgl.Map({
           container: containerRef.current,
           style: MAPBOX_STYLE,
           center: INITIAL_CENTER,
@@ -316,6 +331,16 @@ export function MapboxInfrastructureGlobe({
             return;
           }
 
+          const {
+            countriesCollection: initialCountriesCollection,
+            activeCountryCollection: initialActiveCountryCollection,
+            markersCollection: initialMarkersCollection,
+            palette: initialPalette,
+            statusTone: initialStatusTone,
+            selectedCountryCode: initialSelectedCountryCode,
+            selectedMarkerId: initialSelectedMarkerId,
+          } = mapSetupStateRef.current;
+
           mapInstance.setFog({
             color: "rgb(6, 18, 32)",
             "high-color": "rgb(33, 72, 103)",
@@ -326,17 +351,17 @@ export function MapboxInfrastructureGlobe({
 
           mapInstance.addSource(BASE_COUNTRIES_SOURCE_ID, {
             type: "geojson",
-            data: countriesCollection,
+            data: initialCountriesCollection,
           });
 
           mapInstance.addSource(ACTIVE_COUNTRY_SOURCE_ID, {
             type: "geojson",
-            data: activeCountryCollection,
+            data: initialActiveCountryCollection,
           });
 
           mapInstance.addSource(MARKERS_SOURCE_ID, {
             type: "geojson",
-            data: markersCollection,
+            data: initialMarkersCollection,
           });
 
           mapInstance.addLayer({
@@ -344,7 +369,7 @@ export function MapboxInfrastructureGlobe({
             type: "fill",
             source: BASE_COUNTRIES_SOURCE_ID,
             paint: {
-              "fill-color": palette.land,
+              "fill-color": initialPalette.land,
               "fill-opacity": 0.78,
             },
           });
@@ -356,9 +381,9 @@ export function MapboxInfrastructureGlobe({
             paint: {
               "fill-color": [
                 "case",
-                ["==", ["get", "countryCode"], selectedCountryCode ?? ""],
-                palette.landSelected,
-                palette.landHovered,
+                ["==", ["get", "countryCode"], initialSelectedCountryCode ?? ""],
+                initialPalette.landSelected,
+                initialPalette.landHovered,
               ],
               "fill-opacity": 0.95,
             },
@@ -369,7 +394,7 @@ export function MapboxInfrastructureGlobe({
             type: "line",
             source: BASE_COUNTRIES_SOURCE_ID,
             paint: {
-              "line-color": palette.border,
+              "line-color": initialPalette.border,
               "line-width": 0.8,
             },
           });
@@ -383,20 +408,20 @@ export function MapboxInfrastructureGlobe({
                 "match",
                 ["get", "healthStatus"],
                 "Healthy",
-                statusTone.Healthy,
+                initialStatusTone.Healthy,
                 "Warning",
-                statusTone.Warning,
+                initialStatusTone.Warning,
                 "Critical",
-                statusTone.Critical,
+                initialStatusTone.Critical,
                 "Offline",
-                statusTone.Offline,
+                initialStatusTone.Offline,
                 "Maintenance",
-                statusTone.Maintenance,
-                statusTone.Healthy,
+                initialStatusTone.Maintenance,
+                initialStatusTone.Healthy,
               ],
               "circle-radius": [
                 "case",
-                ["==", ["get", "id"], selectedMarkerId ?? ""],
+                ["==", ["get", "id"], initialSelectedMarkerId ?? ""],
                 9,
                 ["==", ["get", "healthStatus"], "Critical"],
                 7,
@@ -407,7 +432,7 @@ export function MapboxInfrastructureGlobe({
               "circle-stroke-color": "rgba(255,255,255,0.9)",
               "circle-stroke-width": [
                 "case",
-                ["==", ["get", "id"], selectedMarkerId ?? ""],
+                ["==", ["get", "id"], initialSelectedMarkerId ?? ""],
                 2.5,
                 1.4,
               ],
@@ -419,16 +444,16 @@ export function MapboxInfrastructureGlobe({
             id: SELECTED_MARKER_LAYER_ID,
             type: "circle",
             source: MARKERS_SOURCE_ID,
-            filter: ["==", ["get", "id"], selectedMarkerId ?? ""],
+            filter: ["==", ["get", "id"], initialSelectedMarkerId ?? ""],
             paint: {
               "circle-radius": 14,
               "circle-color": "rgba(255,255,255,0.08)",
-              "circle-stroke-color": palette.borderActive,
+              "circle-stroke-color": initialPalette.borderActive,
               "circle-stroke-width": 2,
             },
           });
 
-          function handleCountryHover(event: import("mapbox-gl").MapLayerMouseEvent): void {
+          function handleCountryHover(event: MapLayerMouseEvent): void {
             const feature = event.features?.[0];
             const properties = feature?.properties as CountryFeatureProperties | undefined;
 
@@ -454,7 +479,7 @@ export function MapboxInfrastructureGlobe({
             setHoveredCountry(null);
           }
 
-          function handleCountryClick(event: import("mapbox-gl").MapLayerMouseEvent): void {
+          function handleCountryClick(event: MapLayerMouseEvent): void {
             const feature = event.features?.[0];
             const properties = feature?.properties as CountryFeatureProperties | undefined;
 
@@ -465,7 +490,7 @@ export function MapboxInfrastructureGlobe({
             onSelectCountryRef.current?.(properties.countryCode);
           }
 
-          function handleMarkerHover(event: import("mapbox-gl").MapLayerMouseEvent): void {
+          function handleMarkerHover(event: MapLayerMouseEvent): void {
             const properties = event.features?.[0]?.properties as MarkerFeatureProperties | undefined;
 
             if (!properties) {
@@ -493,7 +518,7 @@ export function MapboxInfrastructureGlobe({
             onHoverMarkerRef.current(null);
           }
 
-          function handleMarkerClick(event: import("mapbox-gl").MapLayerMouseEvent): void {
+          function handleMarkerClick(event: MapLayerMouseEvent): void {
             const properties = event.features?.[0]?.properties as MarkerFeatureProperties | undefined;
 
             if (!properties) {
@@ -541,7 +566,12 @@ export function MapboxInfrastructureGlobe({
           return;
         }
 
-        setSetupError("Mapbox package could not be loaded. Run npm install after pulling this change.");
+        if (error instanceof Error && /(Cannot find module|Failed to fetch dynamically imported module|Failed to resolve module specifier)/i.test(error.message)) {
+          setSetupError("Mapbox package could not be loaded in the browser. Check your install and dev server cache.");
+          return;
+        }
+
+        setSetupError("Mapbox failed to initialize in the browser. Check the console for the exact error.");
       }
     }
 
@@ -738,7 +768,7 @@ export function MapboxInfrastructureGlobe({
                 <p className="mt-1 text-xs text-muted-foreground">{setupError}</p>
               </div>
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-left text-[11px] text-muted-foreground">
-                Add `VITE_MAPBOX_ACCESS_TOKEN` to your environment and run `npm install` so the `mapbox-gl` package is available locally.
+                Add `VITE_MAPBOX_ACCESS_TOKEN` to your environment. If the package is already installed, open the browser console to inspect the initialization error.
               </div>
             </div>
           </div>

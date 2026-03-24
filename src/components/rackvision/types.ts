@@ -15,6 +15,9 @@ export type RackVisionEntityKind = "global" | "region" | "site" | "room" | "row"
 export type RackVisionView = "global" | "hierarchy" | "site" | "rack";
 
 export type RackVisionViewMode = RackVisionView | "layout" | "split";
+export type GlobeRendererMode = "three" | "mapbox";
+export type LayoutOverlayMode = "alerts" | "occupancy" | "thermal" | "power";
+export type RackVisionFilterPresetId = "custom" | "critical-sites" | "high-temp-racks" | "offline-devices";
 
 export type BaseRackVisionEntity = {
   id: string;
@@ -98,6 +101,7 @@ export type RackVisionState = {
   hoveredEntityId: string | null;
   selectedMarkerId: string | null;
   globalViewMode: "regions" | "sites";
+  globeRenderer: GlobeRendererMode;
   expandedNodeIds: string[];
   searchQuery: string;
   rackSearchQuery: string;
@@ -113,10 +117,13 @@ export type RackVisionState = {
   globalSearchResults: RackVisionSearchResult[];
   isSearchResultsOpen: boolean;
   activeFilters: RackVisionActiveFilters;
+  activeFilterPresetId: RackVisionFilterPresetId;
   layoutContext: {
     siteId: string | null;
     roomId: string | null;
   };
+  layoutOverlayMode: LayoutOverlayMode;
+  investigationHistory: InvestigationHistoryEntry[];
   isLoading: boolean;
 };
 
@@ -139,6 +146,23 @@ export type RackVisionActiveFilters = {
   rowId: string | "all";
   alertSeverity: "all" | "warning" | "critical";
   occupancyRange: "all" | "low" | "medium" | "high";
+};
+
+export type RackVisionFilterPreset = {
+  id: RackVisionFilterPresetId;
+  label: string;
+  description: string;
+  filters: RackVisionActiveFilters;
+};
+
+export type InvestigationHistoryEntry = {
+  id: string;
+  entityId: string | null;
+  label: string;
+  kind: RackVisionEntityKind | "global";
+  route: string;
+  view: RackVisionViewMode;
+  timestamp: string;
 };
 
 export type RackFilters = {
@@ -170,6 +194,7 @@ export type RackVisionAction =
   | { type: "SET_HOVERED_ENTITY"; payload: string | null }
   | { type: "SET_SELECTED_MARKER"; payload: string | null }
   | { type: "SET_GLOBAL_VIEW_MODE"; payload: "regions" | "sites" }
+  | { type: "SET_GLOBE_RENDERER"; payload: GlobeRendererMode }
   | { type: "SET_INSPECTOR_ENTITY"; payload: string | null }
   | { type: "SET_TREE_SEARCH"; payload: string }
   | { type: "SET_RACK_SEARCH"; payload: string }
@@ -189,7 +214,12 @@ export type RackVisionAction =
   | { type: "CLOSE_SEARCH_RESULTS" }
   | { type: "SET_ACTIVE_FILTERS"; payload: RackVisionActiveFilters }
   | { type: "CLEAR_ACTIVE_FILTERS" }
+  | { type: "SET_FILTER_PRESET"; payload: RackVisionFilterPresetId }
   | { type: "SET_LAYOUT_CONTEXT"; payload: { siteId: string | null; roomId: string | null } }
+  | { type: "SET_LAYOUT_OVERLAY_MODE"; payload: LayoutOverlayMode }
+  | { type: "SET_INVESTIGATION_HISTORY"; payload: InvestigationHistoryEntry[] }
+  | { type: "PUSH_INVESTIGATION_HISTORY"; payload: InvestigationHistoryEntry }
+  | { type: "CLEAR_INVESTIGATION_HISTORY" }
   | { type: "SET_LOADING"; payload: boolean };
 
 export type RackVisionSelectionContext = {
@@ -215,6 +245,47 @@ export const DEFAULT_ACTIVE_FILTERS: RackVisionActiveFilters = {
   alertSeverity: "all",
   occupancyRange: "all",
 };
+
+export const RACKVISION_FILTER_PRESETS: RackVisionFilterPreset[] = [
+  {
+    id: "custom",
+    label: "All Infrastructure",
+    description: "Default scope across the full RackVision estate.",
+    filters: DEFAULT_ACTIVE_FILTERS,
+  },
+  {
+    id: "critical-sites",
+    label: "Critical Sites",
+    description: "Focus on critical entities and severe alert conditions.",
+    filters: {
+      ...DEFAULT_ACTIVE_FILTERS,
+      status: "Critical",
+      criticalOnly: true,
+      alertSeverity: "critical",
+    },
+  },
+  {
+    id: "high-temp-racks",
+    label: "High Temp Racks",
+    description: "Prioritize dense racks with warning or critical conditions.",
+    filters: {
+      ...DEFAULT_ACTIVE_FILTERS,
+      status: "Warning",
+      occupancyRange: "high",
+      alertSeverity: "warning",
+    },
+  },
+  {
+    id: "offline-devices",
+    label: "Offline Devices",
+    description: "Surface offline assets and incident follow-up work quickly.",
+    filters: {
+      ...DEFAULT_ACTIVE_FILTERS,
+      status: "Offline",
+      offlineOnly: true,
+    },
+  },
+];
 
 export type HierarchyNode = {
   entity: RackVisionEntity;
@@ -408,6 +479,9 @@ export type LayoutRackTileModel = {
   occupancyPercent: number;
   alertCount: number;
   deviceCount: number;
+  avgTemperature: number;
+  powerDrawKw: number;
+  hotspotRisk: "Low" | "Medium" | "High";
 };
 
 export type LayoutRowLaneModel = {
@@ -417,6 +491,9 @@ export type LayoutRowLaneModel = {
   healthStatus: HealthStatus;
   occupancyPercent: number;
   activeAlerts: number;
+  avgTemperature: number;
+  powerDrawKw: number;
+  hotspotRisk: "Low" | "Medium" | "High";
   racks: LayoutRackTileModel[];
 };
 

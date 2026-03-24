@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils";
 type SearchResultsPanelProps = {
   query: string;
   results: RackVisionSearchResult[];
+  activeResultId?: string | null;
   onSelect: (result: RackVisionSearchResult) => void;
 };
 
-export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPanelProps) {
+export function SearchResultsPanel({ query, results, activeResultId, onSelect }: SearchResultsPanelProps) {
   if (!query.trim()) return null;
   if (!results.length) {
     return <NoResultsState title="No entities found" description="Search by site, rack, hostname, or IP address." />;
@@ -30,13 +31,19 @@ export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPa
               {groupItems.map((item) => (
                 <button
                   key={item.id}
+                  id={`rackvision-search-option-${item.id}`}
                   type="button"
                   onClick={() => onSelect(item)}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                  }}
                   role="option"
+                  aria-selected={activeResultId === item.id}
                   aria-label={`${item.name}, ${item.subtitle}`}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left transition",
-                    "hover:border-border hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                    activeResultId === item.id ? "border-primary/40 bg-primary/10" : "hover:border-border hover:bg-muted/30",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                   )}
                 >
                   <EntityIcon kind={item.kind} className="h-3.5 w-3.5 text-muted-foreground" />

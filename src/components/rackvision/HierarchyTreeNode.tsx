@@ -7,33 +7,32 @@ import { cn } from "@/lib/utils";
 type HierarchyTreeNodeProps = {
   node: HierarchyNode;
   depth: number;
-  expandedIds: string[];
-  matchedIds: string[];
-  selectedEntityId: string | null;
+  isSelected: boolean;
+  isActive: boolean;
+  hasChildren: boolean;
+  isExpanded: boolean;
+  isMatched: boolean;
   onToggleExpanded: (id: string) => void;
   onSelectNode: (node: HierarchyNode) => void;
   onOpenNode: (node: HierarchyNode) => void;
-  isVisible: (node: HierarchyNode) => boolean;
+  buttonRef?: (element: HTMLButtonElement | null) => void;
+  onFocusNode: (id: string) => void;
 };
 
 export function HierarchyTreeNode({
   node,
   depth,
-  expandedIds,
-  matchedIds,
-  selectedEntityId,
+  isSelected,
+  isActive,
+  hasChildren,
+  isExpanded,
+  isMatched,
   onToggleExpanded,
   onSelectNode,
   onOpenNode,
-  isVisible,
+  buttonRef,
+  onFocusNode,
 }: HierarchyTreeNodeProps) {
-  if (!isVisible(node)) return null;
-
-  const hasChildren = node.children.length > 0;
-  const isExpanded = expandedIds.includes(node.entity.id);
-  const isSelected = selectedEntityId === node.entity.id;
-  const isMatched = matchedIds.includes(node.entity.id);
-
   const secondaryMeta =
     node.entity.kind === "device"
       ? `${node.entity.deviceType} • ${node.entity.ipAddress}`
@@ -42,28 +41,40 @@ export function HierarchyTreeNode({
         : `${node.children.length} child ${node.children.length === 1 ? "node" : "nodes"}`;
 
   return (
-    <div role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined} aria-selected={isSelected}>
-      <div
-        className={cn(
-          "group flex items-center gap-1 rounded-md border px-1.5 py-1.5 transition-colors",
-          isSelected ? "border-primary bg-primary/10" : "border-transparent hover:border-border hover:bg-muted/40",
-        )}
-      >
+    <div className="space-y-0.5">
+      <div className="flex items-start gap-1">
         <button
           type="button"
           onClick={() => hasChildren && onToggleExpanded(node.entity.id)}
-          className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className={cn(
+            "mt-0.5 grid h-5 w-5 place-items-center rounded-sm text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            !hasChildren && "pointer-events-none opacity-40",
+          )}
           aria-label={hasChildren ? `${isExpanded ? "Collapse" : "Expand"} ${node.entity.name}` : `${node.entity.name} has no child nodes`}
           aria-hidden={hasChildren ? undefined : true}
-          tabIndex={hasChildren ? 0 : -1}
+          tabIndex={-1}
         >
           {hasChildren ? <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-90")} /> : null}
         </button>
         <button
+          ref={buttonRef}
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          role="treeitem"
+          aria-level={depth + 1}
+          aria-expanded={hasChildren ? isExpanded : undefined}
+          aria-selected={isSelected}
+          tabIndex={isActive ? 0 : -1}
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-1.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            isSelected ? "border-primary bg-primary/10" : "border-transparent hover:border-border hover:bg-muted/40",
+            isActive && "ring-1 ring-ring",
+          )}
           style={{ paddingLeft: `${depth * 8}px` }}
-          onClick={() => onSelectNode(node)}
+          onFocus={() => onFocusNode(node.entity.id)}
+          onClick={() => {
+            onFocusNode(node.entity.id);
+            onSelectNode(node);
+          }}
           onDoubleClick={() => onOpenNode(node)}
           aria-label={`${node.entity.name}, ${node.entity.kind}`}
         >
@@ -74,22 +85,6 @@ export function HierarchyTreeNode({
         </button>
       </div>
       <p className="truncate pl-9 text-[11px] text-muted-foreground">{secondaryMeta}</p>
-      {hasChildren && isExpanded ? (
-        <div className="mt-1 space-y-0.5 border-l border-border/70 pl-2" role="group">{node.children.map((child) => (
-          <HierarchyTreeNode
-            key={child.entity.id}
-            node={child}
-            depth={depth + 1}
-            expandedIds={expandedIds}
-            matchedIds={matchedIds}
-            selectedEntityId={selectedEntityId}
-            onToggleExpanded={onToggleExpanded}
-            onSelectNode={onSelectNode}
-            onOpenNode={onOpenNode}
-            isVisible={isVisible}
-          />
-        ))}</div>
-      ) : null}
     </div>
   );
 }

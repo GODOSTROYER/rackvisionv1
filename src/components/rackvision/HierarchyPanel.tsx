@@ -31,6 +31,9 @@ export function HierarchyPanel({ nodes, onSearch, onSelectEntity, onOpenDevice }
           onSearch(query);
         }}
       />
+      <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+        Arrow keys move between entities, <code className="rounded bg-muted px-1 py-0.5">Enter</code> selects, and <code className="rounded bg-muted px-1 py-0.5">Ctrl+Enter</code> opens devices.
+      </p>
 
       <ScrollArea className="h-[320px] pr-2 sm:h-[420px] xl:h-[520px]" aria-label="RackVision hierarchy tree">
         <HierarchyTree

@@ -38,6 +38,8 @@ type GlobalInfrastructureViewProps = {
   onOpenDevice: (id: string) => Promise<void>;
   globalViewMode: "regions" | "sites";
   onGlobalViewModeChange: (mode: "regions" | "sites") => void;
+  globeRenderer: "three" | "mapbox";
+  onGlobeRendererChange: (mode: "three" | "mapbox") => void;
 };
 
 export function GlobalInfrastructureView({
@@ -62,8 +64,9 @@ export function GlobalInfrastructureView({
   onOpenDevice,
   globalViewMode,
   onGlobalViewModeChange,
+  globeRenderer,
+  onGlobeRendererChange,
 }: GlobalInfrastructureViewProps) {
-  const [globeRenderer, setGlobeRenderer] = useState<"three" | "mapbox">("three");
   const [selectedCountryCode, setSelectedCountryCode] = useState<string | null>(null);
   const [countrySummary, setCountrySummary] = useState<Awaited<ReturnType<typeof MockDataService.getCountryInfrastructureSummary>> | null>(null);
   const [countrySites, setCountrySites] = useState<Awaited<ReturnType<typeof MockDataService.getCountrySites>>>([]);
@@ -150,7 +153,7 @@ export function GlobalInfrastructureView({
               value={globeRenderer}
               onValueChange={(value) => {
                 if (value === "three" || value === "mapbox") {
-                  setGlobeRenderer(value);
+                  onGlobeRendererChange(value);
                 }
               }}
               aria-label="Globe renderer"
