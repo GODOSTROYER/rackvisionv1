@@ -485,16 +485,20 @@ function RackVisionWorkspace() {
         <BreadcrumbBar onSelectBreadcrumb={handleBreadcrumbSelect} />
 
         {initialLoading ? (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Skeleton className="h-[220px]" />
             <Skeleton className="h-[220px]" />
             <Skeleton className="h-[220px]" />
           </div>
         ) : (
           <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-            <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
-            <div className="min-h-[720px]">{renderCenter()}</div>
-            <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
+            <div className="order-2 xl:order-1">
+              <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
+            </div>
+            <div className="order-1 min-h-[520px] sm:min-h-[640px] xl:order-2 xl:min-h-[720px]">{renderCenter()}</div>
+            <div className="order-3">
+              <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
+            </div>
           </div>
         )}
       </section>

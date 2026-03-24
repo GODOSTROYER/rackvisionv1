@@ -27,7 +27,7 @@ export function RackToolbar({
 }: RackToolbarProps) {
   return (
     <div className="space-y-2 rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <RackDeviceSearch value={state.rackDeviceSearchQuery} onChange={onDeviceSearchChange} />
         <RackSwitcher racks={rackOptions} activeRackId={activeRackId} onSwitch={onSwitchRack} />
       </div>

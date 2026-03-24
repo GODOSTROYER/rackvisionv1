@@ -1,6 +1,6 @@
 # RackVision
 
-RackVision is a frontend infrastructure-visualization module built inside a Pulseway-style admin dashboard. It provides a mock enterprise ops experience with global infrastructure mapping, site and room drill-downs, rack exploration, hierarchy search, and system-detail handoff flows.
+RackVision is a frontend-only infrastructure-visualization module built inside a Pulseway-style admin dashboard. It provides a mock enterprise ops experience with global infrastructure mapping, site and room drill-downs, rack exploration, hierarchy search, and system-detail handoff flows.
 
 ## Stack
 
@@ -69,6 +69,23 @@ npm run dev
 http://localhost:5173
 ```
 
+## Optional Mapbox Setup
+
+The app runs without Mapbox, but the Globe view includes a Mapbox renderer toggle.
+
+If you want to use the Mapbox mode:
+
+1. Create a file named `.env.local` in the project root.
+2. Add your public token:
+
+```env
+VITE_MAPBOX_ACCESS_TOKEN=pk.your_public_mapbox_token_here
+```
+
+3. Restart `npm run dev`.
+
+If the token is missing, the app still runs and the Mapbox renderer shows a setup message instead of failing the whole workspace.
+
 ## Available Scripts
 
 - `npm run dev`: start the local dev server
@@ -103,10 +120,11 @@ Typical user flow:
 
 ## Notes For Development
 
-- The globe uses local country polygon data from `src/data/countries.json`
-- Mock infrastructure data is provided by `src/services/rackvision/MockDataService.ts`
-- The app is frontend-only in its current form
-- Several actions are intentionally UI placeholders and do not persist backend state
+- The app is frontend-only. There is no backend API, database, or server-side data source.
+- Mock infrastructure, hierarchy, and globe data are generated locally in functions inside `src/services/rackvision/MockDataService.ts`.
+- The globe uses local country polygon data from `src/data/countries.json`.
+- Several actions are intentionally UI placeholders and do not persist backend state.
+- The `.env.local` file is ignored by Git so local tokens stay local.
 
 ## Recommended Verification
 
@@ -118,11 +136,16 @@ npm run test
 npm run build
 ```
 
+## Security Check
+
+At the time of this update, `npm audit --omit=dev` reports `0 vulnerabilities` for production dependencies.
+
 ## Troubleshooting
 
 - If `npm run dev` fails immediately, make sure `node_modules` exists and `npm install` completed successfully
 - If the globe renders without country polygons, verify `src/data/countries.json` is present and valid GeoJSON
 - If route deep links do not behave as expected, start from `/dashboard/rackvision` and confirm mock data files have not been modified unexpectedly
+- If Mapbox mode says it is not ready, confirm `VITE_MAPBOX_ACCESS_TOKEN` is set in `.env.local`
 
 ## Repository
 

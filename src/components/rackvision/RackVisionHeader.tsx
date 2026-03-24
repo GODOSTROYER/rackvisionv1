@@ -26,7 +26,7 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
   return (
     <div className="space-y-3">
       <PageHeader title="RackVision" subtitle="Visual infrastructure hierarchy and rack explorer" />
-      <div className="grid gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 rounded-lg border border-border bg-card p-3 sm:grid-cols-2 xl:grid-cols-5">
         <GlobalSearchCommand
           query={props.searchQuery}
           results={props.searchResults}
@@ -63,11 +63,11 @@ export function RackVisionHeader(props: RackVisionHeaderProps) {
           Search spans Regions/Sites/Rooms/Rows/Racks/Devices with context-aware drill-down.
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={props.onRefresh}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={props.onRefresh}>
           <RefreshCw className="mr-1 h-4 w-4" /> Refresh
         </Button>
-        <Button variant="outline" size="sm" onClick={props.onExport}>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={props.onExport}>
           <Download className="mr-1 h-4 w-4" /> Export Snapshot
         </Button>
       </div>

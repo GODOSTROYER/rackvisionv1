@@ -25,13 +25,13 @@ export function RackHeader({ model, siteName, onPrevRack, onNextRack, onOpenSyst
           </div>
           <p className="text-xs text-muted-foreground">{siteName} • {model.rack.roomName} • {model.rack.rowName}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <Button size="sm" variant="outline" onClick={onPrevRack} disabled={!model.previousRackId}><ChevronLeft className="h-4 w-4" />Previous</Button>
-          <Button size="sm" variant="outline" onClick={onNextRack} disabled={!model.nextRackId}>Next<ChevronRight className="h-4 w-4" /></Button>
-          <Button size="sm" variant="outline" onClick={onOpenSystem}>Open in Systems</Button>
-          <Button size="sm" variant="outline" onClick={onViewAlerts}><ShieldAlert className="h-4 w-4" />View Alerts</Button>
-          <Button size="sm" variant="outline" onClick={onMaintenance}><Hammer className="h-4 w-4" />Maintenance</Button>
-          <Button size="sm" variant="outline" onClick={onExport}><Download className="h-4 w-4" />Export</Button>
+        <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:justify-end">
+          <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={onPrevRack} disabled={!model.previousRackId}><ChevronLeft className="h-4 w-4" />Previous</Button>
+          <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={onNextRack} disabled={!model.nextRackId}>Next<ChevronRight className="h-4 w-4" /></Button>
+          <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={onOpenSystem}>Open in Systems</Button>
+          <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={onViewAlerts}><ShieldAlert className="h-4 w-4" />View Alerts</Button>
+          <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={onMaintenance}><Hammer className="h-4 w-4" />Maintenance</Button>
+          <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={onExport}><Download className="h-4 w-4" />Export</Button>
         </div>
       </div>
     </div>

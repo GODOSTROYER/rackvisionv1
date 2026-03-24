@@ -135,13 +135,13 @@ export function GlobalInfrastructureView({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-2">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
           <Globe2 className="h-4 w-4" /> Global Infrastructure View
           {selectedEntityName ? <span className="text-muted-foreground">• {selectedEntityName}</span> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="flex w-full items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1 sm:w-auto">
             <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Renderer</span>
             <ToggleGroup
               type="single"
@@ -163,8 +163,8 @@ export function GlobalInfrastructureView({
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <Button variant={globalViewMode === "regions" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("regions")} aria-pressed={globalViewMode === "regions"}>Regions</Button>
-          <Button variant={globalViewMode === "sites" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("sites")} aria-pressed={globalViewMode === "sites"}>Sites</Button>
+          <Button className="flex-1 sm:flex-none" variant={globalViewMode === "regions" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("regions")} aria-pressed={globalViewMode === "regions"}>Regions</Button>
+          <Button className="flex-1 sm:flex-none" variant={globalViewMode === "sites" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("sites")} aria-pressed={globalViewMode === "sites"}>Sites</Button>
         </div>
       </div>
 

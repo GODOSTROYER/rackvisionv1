@@ -16,7 +16,7 @@ export function HierarchyPanel({ nodes, onSearch, onSelectEntity, onOpenDevice }
   const { state, dispatch } = useRackVision();
 
   return (
-    <aside className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <aside className="min-h-0 rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Hierarchy</h2>
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -32,7 +32,7 @@ export function HierarchyPanel({ nodes, onSearch, onSelectEntity, onOpenDevice }
         }}
       />
 
-      <ScrollArea className="h-[520px] pr-2" aria-label="RackVision hierarchy tree">
+      <ScrollArea className="h-[320px] pr-2 sm:h-[420px] xl:h-[520px]" aria-label="RackVision hierarchy tree">
         <HierarchyTree
           nodes={nodes}
           selectedEntityId={state.selectedEntityId}

@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { RackDeviceViewModel } from "@/components/rackvision/types";
 import { RackFrame } from "@/components/rackvision/RackFrame";
 import { RackUnitLabelColumn } from "@/components/rackvision/RackUnitLabelColumn";
@@ -15,15 +14,8 @@ type RackElevationProps = {
 
 export function RackElevation({ devices, emptyUnits, showEmptyUnits, selectedDeviceId, onSelectDevice, onHoverDevice, onOpenSystem }: RackElevationProps) {
   return (
-    <div className="overflow-auto rounded-md border border-border bg-background/60 p-2">
-      <div
-        className="grid min-w-[720px] gap-3 md:grid-cols-[56px_minmax(0,1fr)]"
-        style={
-          {
-            "--rack-unit-height": "24px",
-          } as CSSProperties
-        }
-      >
+    <div className="overflow-auto rounded-md border border-border bg-background/60 p-1.5 sm:p-2">
+      <div className="grid min-w-[640px] gap-2 [grid-template-columns:44px_minmax(0,1fr)] [--rack-unit-height:28px] sm:min-w-[720px] sm:gap-3 sm:[grid-template-columns:56px_minmax(0,1fr)] sm:[--rack-unit-height:24px]">
         <RackUnitLabelColumn />
         <RackFrame
           devices={devices}

@@ -8,13 +8,13 @@ type RackSortControlProps = {
 
 export function RackSortControl({ value, onChange }: RackSortControlProps) {
   return (
-    <label className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground">
+    <label className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground sm:inline-flex sm:w-auto sm:justify-start">
       <ArrowDownWideNarrow className="h-3.5 w-3.5" />
-      <span className="hidden sm:inline">Sort</span>
+      <span>Sort</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as RackSortOption)}
-        className="bg-transparent text-xs text-foreground outline-none"
+        className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none sm:flex-none"
       >
         <option value="rack_id">Rack ID</option>
         <option value="occupancy">Occupancy %</option>

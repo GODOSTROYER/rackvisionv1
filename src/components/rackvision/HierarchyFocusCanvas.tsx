@@ -94,10 +94,10 @@ function HierarchyBranch({
   return (
     <div className="space-y-2">
       <div className="relative">
-        {depth > 0 ? <div className="absolute -left-4 top-0 h-full border-l border-border/70" /> : null}
+        {depth > 0 ? <div className="absolute -left-3 top-0 h-full border-l border-border/70 sm:-left-4" /> : null}
         <article
           className={cn(
-            "relative rounded-lg border bg-card p-3 shadow-sm transition-colors",
+            "relative rounded-lg border bg-card p-2.5 shadow-sm transition-colors sm:p-3",
             isSelected ? "border-primary bg-primary/5" : "border-border",
           )}
         >
@@ -118,13 +118,13 @@ function HierarchyBranch({
               </div>
             </button>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
               {node.entity.kind === "device" ? (
-                <Button size="sm" variant="outline" onClick={() => onOpenDevice(node.entity.id)}>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenDevice(node.entity.id)}>
                   Open System
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => onSelectEntity(node.entity.id)}>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => onSelectEntity(node.entity.id)}>
                   Focus
                 </Button>
               )}
@@ -134,7 +134,7 @@ function HierarchyBranch({
       </div>
 
       {hasChildren ? (
-        <div className="ml-4 space-y-2 border-l border-dashed border-border/70 pl-4">
+        <div className="ml-3 space-y-2 border-l border-dashed border-border/70 pl-3 sm:ml-4 sm:pl-4">
           {node.children.map((child) => (
             <HierarchyBranch
               key={child.entity.id}
@@ -163,7 +163,7 @@ export function HierarchyFocusCanvas({
   const rootName = focusedNode?.entity.name ?? "Global Infrastructure";
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-start gap-2">
           <Network className="mt-0.5 h-4 w-4 text-primary" />
@@ -172,14 +172,14 @@ export function HierarchyFocusCanvas({
             <p className="mt-1 text-xs text-muted-foreground">{getHierarchyDescription(rootKind)}</p>
           </div>
         </div>
-        <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <div className="w-full rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:w-auto">
           <span className="font-medium text-foreground">{rootName}</span>
           <span className="mx-1">•</span>
           <span>{focusedNode ? `${focusedNode.children.length} direct children` : `${nodes.length} top-level branches`}</span>
         </div>
       </div>
 
-      <ScrollArea className="h-[640px] pr-3" aria-label="Expanded hierarchy focus canvas">
+      <ScrollArea className="h-[420px] pr-3 sm:h-[520px] xl:h-[640px]" aria-label="Expanded hierarchy focus canvas">
         <div className="space-y-3 pb-4">
           {rootNodes.map((node) => (
             <div key={node.entity.id} className="space-y-2">

@@ -218,10 +218,10 @@ export function SiteOverviewCanvas({
               {overview.site.city}, {overview.site.country} • {overview.regionName}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             <StatusBadge status={overview.site.healthStatus} />
-            <Button size="sm" variant="outline">Snapshot</Button>
-            <Button size="sm" variant="outline">Run Checks</Button>
+            <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Snapshot</Button>
+            <Button size="sm" variant="outline" className="flex-1 sm:flex-none">Run Checks</Button>
           </div>
         </div>
       </div>
@@ -237,7 +237,7 @@ export function SiteOverviewCanvas({
       </div>
 
       <div className="space-y-2 rounded-xl border border-border bg-card p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <RackSearchBar value={state.rackSearchQuery} onChange={(value) => dispatch({ type: "SET_RACK_SEARCH", payload: value })} />
           <RackSortControl value={state.rackSortBy} onChange={(value) => dispatch({ type: "SET_RACK_SORT", payload: value })} />
         </div>

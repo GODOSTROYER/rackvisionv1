@@ -7,13 +7,13 @@ export function RackUnitLabelColumn({ totalUnits = 42 }: RackUnitLabelColumnProp
 
   return (
     <div
-      className="grid gap-px rounded-md border border-border bg-border p-px text-[10px]"
+      className="grid gap-px rounded-md border border-border bg-border p-px text-[9px] sm:text-[10px]"
       style={{
         gridTemplateRows: `repeat(${totalUnits}, minmax(var(--rack-unit-height, 24px), var(--rack-unit-height, 24px)))`,
       }}
     >
       {units.map((unit) => (
-        <div key={unit} className="flex min-h-[var(--rack-unit-height,24px)] items-center justify-end bg-background pr-1.5 text-muted-foreground">
+        <div key={unit} className="flex min-h-[var(--rack-unit-height,24px)] items-center justify-end bg-background pr-1 text-muted-foreground sm:pr-1.5">
           U{unit}
         </div>
       ))}

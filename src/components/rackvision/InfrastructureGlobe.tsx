@@ -273,7 +273,7 @@ export function InfrastructureGlobe({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div ref={containerRef} className="relative h-[520px] w-full rounded-lg border border-border/70 bg-muted/10">
+      <div ref={containerRef} className="relative h-[360px] w-full rounded-lg border border-border/70 bg-muted/10 sm:h-[440px] xl:h-[520px]">
         <Globe
           ref={globeRef}
           width={size.width}
@@ -317,7 +317,7 @@ export function InfrastructureGlobe({
         />
 
         {!countryCount ? (
-          <div className="absolute left-3 top-3 z-20 flex max-w-sm items-start gap-2 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm">
+          <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] items-start gap-2 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm sm:max-w-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
             <div>
               <div className="font-medium">Country polygon data failed to load.</div>
@@ -333,7 +333,7 @@ export function InfrastructureGlobe({
         )}
 
         {selectedOrHoveredSummary ? (
-          <div className="pointer-events-none absolute right-4 top-4 z-20">
+          <div className="pointer-events-none absolute left-3 right-3 top-16 z-20 sm:left-auto sm:right-4 sm:top-4">
             <EntityHoverSummaryCard summary={selectedOrHoveredSummary} />
           </div>
         ) : null}

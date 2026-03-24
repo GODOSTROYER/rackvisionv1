@@ -17,13 +17,13 @@ type InspectorPanelProps = {
 
 export function InspectorPanel({ loading, summary }: InspectorPanelProps) {
   return (
-    <aside className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <aside className="min-h-0 rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Inspector</h2>
         <span className="text-xs text-muted-foreground">Entity details</span>
       </div>
 
-      <ScrollArea className="h-[520px] pr-2">
+      <ScrollArea className="h-[320px] pr-2 sm:h-[420px] xl:h-[520px]">
         {loading ? <InspectorSkeleton /> : null}
         {!loading && !summary ? <InspectorEmptyState /> : null}
         {!loading && summary?.entity.kind === "region" ? <RegionInspector summary={summary} /> : null}

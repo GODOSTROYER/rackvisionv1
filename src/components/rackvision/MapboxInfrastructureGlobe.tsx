@@ -690,11 +690,11 @@ export function MapboxInfrastructureGlobe({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="relative h-[520px] w-full overflow-hidden rounded-lg border border-border/70 bg-muted/10">
+      <div className="relative h-[360px] w-full overflow-hidden rounded-lg border border-border/70 bg-muted/10 sm:h-[440px] xl:h-[520px]">
         <div ref={containerRef} className="h-full w-full" />
 
         {!countryCount ? (
-          <div className="absolute left-3 top-3 z-20 flex max-w-sm items-start gap-2 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm">
+          <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] items-start gap-2 rounded-md border border-warning/60 bg-background/95 px-3 py-2 text-xs text-foreground shadow-sm sm:max-w-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
             <div>
               <div className="font-medium">Country polygon data failed to load.</div>
@@ -710,7 +710,7 @@ export function MapboxInfrastructureGlobe({
         )}
 
         {selectedOrHoveredSummary ? (
-          <div className="pointer-events-none absolute right-4 top-4 z-20">
+          <div className="pointer-events-none absolute left-3 right-3 top-16 z-20 sm:left-auto sm:right-4 sm:top-4">
             <EntityHoverSummaryCard summary={selectedOrHoveredSummary} />
           </div>
         ) : null}
@@ -722,7 +722,7 @@ export function MapboxInfrastructureGlobe({
         ) : null}
 
         {!setupError && mapReady ? (
-          <div className="absolute bottom-3 right-3 z-20 rounded-md border border-border bg-background/92 px-3 py-2 text-[11px] text-muted-foreground shadow-sm">
+          <div className="absolute bottom-3 left-3 right-3 z-20 rounded-md border border-border bg-background/92 px-3 py-2 text-[11px] text-muted-foreground shadow-sm sm:left-auto sm:right-3">
             Drag to spin · Scroll to zoom · Right-drag to tilt
           </div>
         ) : null}

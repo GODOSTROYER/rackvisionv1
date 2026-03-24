@@ -21,7 +21,7 @@ export function SearchResultsPanel({ query, results, onSelect }: SearchResultsPa
   }, {});
 
   return (
-    <div id="rackvision-search-results" className="max-h-[340px] overflow-auto rounded-lg border border-border bg-card p-2 shadow-sm" role="listbox" aria-label="RackVision search results">
+    <div id="rackvision-search-results" className="max-h-[260px] overflow-auto rounded-lg border border-border bg-card p-2 shadow-sm sm:max-h-[340px]" role="listbox" aria-label="RackVision search results">
       <div className="space-y-2">
         {Object.entries(groups).map(([group, groupItems]) => (
           <div key={group}>

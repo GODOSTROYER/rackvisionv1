@@ -7,7 +7,7 @@ type EntityHoverSummaryCardProps = {
 
 export function EntityHoverSummaryCard({ summary }: EntityHoverSummaryCardProps) {
   return (
-    <div className="w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
+    <div className="w-[min(18rem,calc(100vw-2.5rem))] rounded-lg border border-border bg-popover p-3 shadow-lg sm:w-72">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-popover-foreground">{summary.title}</p>
