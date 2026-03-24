@@ -30,11 +30,25 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function countRingPoints(ring: unknown) {
+function getGeoJsonSourceKind(source: unknown): NormalizedGeoJsonResult["diagnostics"]["sourceKind"] {
+  if (Array.isArray(source)) return "feature_array";
+  if (isRecord(source) && Array.isArray((source as GeoJsonCollectionLike).features)) return "feature_collection";
+  return "invalid";
+}
+
+function getRawFeatures(source: unknown): unknown[] {
+  const sourceKind = getGeoJsonSourceKind(source);
+
+  if (sourceKind === "feature_array") return source as unknown[];
+  if (sourceKind === "feature_collection") return (source as GeoJsonCollectionLike).features as unknown[];
+  return [];
+}
+
+function countRingPoints(ring: unknown): number {
   return Array.isArray(ring) ? ring.length : 0;
 }
 
-function countGeometryPoints(geometry: GeoJsonFeature["geometry"]) {
+function countGeometryPoints(geometry: GeoJsonFeature["geometry"]): number {
   if (!isRecord(geometry) || !Array.isArray(geometry.coordinates)) return 0;
   if (geometry.type === "Polygon") {
     return geometry.coordinates.reduce((sum, ring) => sum + countRingPoints(ring), 0);
@@ -48,7 +62,7 @@ function countGeometryPoints(geometry: GeoJsonFeature["geometry"]) {
   return 0;
 }
 
-function simplifyRing(ring: unknown, maxPoints: number) {
+function simplifyRing(ring: unknown, maxPoints: number): unknown {
   if (!Array.isArray(ring) || ring.length <= 4) return ring;
 
   const firstPoint = ring[0];
@@ -72,7 +86,7 @@ function simplifyRing(ring: unknown, maxPoints: number) {
   return isClosed ? [...simplified, simplified[0]] : simplified;
 }
 
-function simplifyGeometry(feature: GeoJsonFeature) {
+function simplifyGeometry(feature: GeoJsonFeature): GeoJsonFeature {
   const geometry = feature.geometry;
   if (!isRecord(geometry) || !Array.isArray(geometry.coordinates)) return feature;
 
@@ -101,24 +115,16 @@ function simplifyGeometry(feature: GeoJsonFeature) {
   return feature;
 }
 
+function isPolygonFeature(feature: unknown): feature is GeoJsonFeature {
+  if (!isRecord(feature)) return false;
+  const geometryType = isRecord(feature.geometry) ? feature.geometry.type : undefined;
+  return geometryType === "Polygon" || geometryType === "MultiPolygon";
+}
+
 export function normalizeGeoJsonFeatures(source: unknown): NormalizedGeoJsonResult {
-  const sourceKind: NormalizedGeoJsonResult["diagnostics"]["sourceKind"] = Array.isArray(source)
-    ? "feature_array"
-    : isRecord(source) && Array.isArray((source as GeoJsonCollectionLike).features)
-      ? "feature_collection"
-      : "invalid";
-
-  const rawFeatures = Array.isArray(source)
-    ? source
-    : isRecord(source) && Array.isArray((source as GeoJsonCollectionLike).features)
-      ? ((source as GeoJsonCollectionLike).features as unknown[])
-      : [];
-
-  const polygonFeatures = rawFeatures.filter((feature): feature is GeoJsonFeature => {
-    if (!isRecord(feature)) return false;
-    const geometryType = isRecord(feature.geometry) ? feature.geometry.type : undefined;
-    return geometryType === "Polygon" || geometryType === "MultiPolygon";
-  });
+  const sourceKind = getGeoJsonSourceKind(source);
+  const rawFeatures = getRawFeatures(source);
+  const polygonFeatures = rawFeatures.filter(isPolygonFeature);
 
   const simplifiedFeatures = polygonFeatures.map(simplifyGeometry);
   const totalPoints = polygonFeatures.reduce((sum, feature) => sum + countGeometryPoints(feature.geometry), 0);

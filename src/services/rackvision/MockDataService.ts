@@ -39,7 +39,7 @@ import {
 const DELAY_MS = 300;
 const wait = async (ms = DELAY_MS) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const regions: Region[] = [
+const seedRegions: Region[] = [
   {
     id: "region-ap-south",
     name: "AP-South",
@@ -72,7 +72,7 @@ const regions: Region[] = [
   },
 ];
 
-const sites: Site[] = [
+const seedSites: Site[] = [
   {
     id: "site-mumbai-dc1",
     name: "Mumbai-DC1",
@@ -114,19 +114,19 @@ const sites: Site[] = [
   },
 ];
 
-const rooms: Room[] = [
+const seedRooms: Room[] = [
   { id: "room-mumbai-a", name: "Room A", kind: "room", parentId: "site-mumbai-dc1", siteId: "site-mumbai-dc1", healthStatus: "Warning" },
   { id: "room-frankfurt-a", name: "Room A", kind: "room", parentId: "site-frankfurt-dc1", siteId: "site-frankfurt-dc1", healthStatus: "Healthy" },
   { id: "room-virginia-b", name: "Room B", kind: "room", parentId: "site-virginia-dc3", siteId: "site-virginia-dc3", healthStatus: "Critical" },
 ];
 
-const rows: Row[] = [
+const seedRows: Row[] = [
   { id: "row-mumbai-01", name: "Row 01", kind: "row", parentId: "room-mumbai-a", roomId: "room-mumbai-a", healthStatus: "Warning" },
   { id: "row-frankfurt-02", name: "Row 02", kind: "row", parentId: "room-frankfurt-a", roomId: "room-frankfurt-a", healthStatus: "Healthy" },
   { id: "row-virginia-03", name: "Row 03", kind: "row", parentId: "room-virginia-b", roomId: "room-virginia-b", healthStatus: "Critical" },
 ];
 
-const racks: Rack[] = [
+const seedRacks: Rack[] = [
   {
     id: "rack-a-01",
     name: "RACK-A-01",
@@ -159,7 +159,7 @@ const racks: Rack[] = [
   },
 ];
 
-const devices: Device[] = [
+const seedDevices: Device[] = [
   {
     id: "device-srv-db-01",
     name: "SRV-DB-01",
@@ -362,13 +362,13 @@ const devices: Device[] = [
   },
 ];
 
-const siteMetrics: Record<string, { occupancy: number; avgTemp: number; powerUtilization: number; activeAlerts: number }> = {
+const seedSiteMetrics: Record<string, { occupancy: number; avgTemp: number; powerUtilization: number; activeAlerts: number }> = {
   "site-mumbai-dc1": { occupancy: 78, avgTemp: 31, powerUtilization: 66, activeAlerts: 4 },
   "site-frankfurt-dc1": { occupancy: 64, avgTemp: 28, powerUtilization: 54, activeAlerts: 2 },
   "site-virginia-dc3": { occupancy: 85, avgTemp: 36, powerUtilization: 79, activeAlerts: 7 },
 };
 
-const siteMeta: Record<string, { facilityType: string; powerCapacity: string; coolingStatus: string; lastSync: string; networkStatus: string; availability: string }> = {
+const seedSiteMeta: Record<string, { facilityType: string; powerCapacity: string; coolingStatus: string; lastSync: string; networkStatus: string; availability: string }> = {
   "site-mumbai-dc1": {
     facilityType: "Tier III Colocation",
     powerCapacity: "2.8 MW",
@@ -395,18 +395,542 @@ const siteMeta: Record<string, { facilityType: string; powerCapacity: string; co
   },
 };
 
-const rackMetrics: Record<string, { powerLoadKw: number; temperatureState: string; recentAlerts: string[] }> = {
+const seedRackMetrics: Record<string, { powerLoadKw: number; temperatureState: string; recentAlerts: string[] }> = {
   "rack-a-01": { powerLoadKw: 7.4, temperatureState: "Slightly Elevated", recentAlerts: ["RAID rebuild running", "Memory pressure above threshold"] },
   "rack-b-07": { powerLoadKw: 5.9, temperatureState: "Stable", recentAlerts: ["Backup job completed"] },
   "net-rack-03": { powerLoadKw: 8.1, temperatureState: "Hot Zone", recentAlerts: ["Interface flaps detected", "Firewall CPU sustained >75%"] },
 };
 
-const recentIssues = [
+const seedRecentIssues = [
   { id: "iss-1", entityId: "site-virginia-dc3", severity: "Critical", text: "Cooling loop imbalance in Room B", time: "6m ago" },
   { id: "iss-2", entityId: "rack-a-01", severity: "Warning", text: "High memory utilization on SRV-DB-01", time: "18m ago" },
   { id: "iss-3", entityId: "device-fw-edge-01", severity: "Critical", text: "Firewall throughput saturation", time: "2m ago" },
   { id: "iss-4", entityId: "region-ap-south", severity: "Warning", text: "Patch backlog increasing in AP-South", time: "39m ago" },
 ];
+
+type SiteMetricRecord = {
+  occupancy: number;
+  avgTemp: number;
+  powerUtilization: number;
+  activeAlerts: number;
+};
+
+type SiteMetaRecord = {
+  facilityType: string;
+  powerCapacity: string;
+  coolingStatus: string;
+  lastSync: string;
+  networkStatus: string;
+  availability: string;
+};
+
+type RackMetricRecord = {
+  powerLoadKw: number;
+  temperatureState: string;
+  recentAlerts: string[];
+};
+
+type RecentIssue = {
+  id: string;
+  entityId: string;
+  severity: "Critical" | "Warning";
+  text: string;
+  time: string;
+};
+
+type GeneratedTopology = {
+  regions: Region[];
+  sites: Site[];
+  rooms: Room[];
+  rows: Row[];
+  racks: Rack[];
+  devices: Device[];
+  siteMetrics: Record<string, SiteMetricRecord>;
+  siteMeta: Record<string, SiteMetaRecord>;
+  rackMetrics: Record<string, RackMetricRecord>;
+  recentIssues: RecentIssue[];
+};
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getHealthStatusFromScore(score: number): HealthStatus {
+  if (score >= 9) {
+    return "Critical";
+  }
+
+  if (score >= 6) {
+    return "Warning";
+  }
+
+  if (score === 0) {
+    return "Offline";
+  }
+
+  if (score === 1) {
+    return "Maintenance";
+  }
+
+  return "Healthy";
+}
+
+function formatUptime(days: number, hours: number): string {
+  return `${days}d ${hours}h`;
+}
+
+function formatNetworkIo(inbound: number, outbound: number): string {
+  return `${inbound + outbound} Mbps`;
+}
+
+function getCityCode(city: string): string {
+  return city.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase();
+}
+
+function getCountryCodeLabel(countryCode: string): string {
+  return countryCode.toUpperCase();
+}
+
+function getSiteCode(countryCode: string, city: string, siteNumber: number): string {
+  return `${getCountryCodeLabel(countryCode)}-${getCityCode(city)}-${String(siteNumber).padStart(2, "0")}`;
+}
+
+function getRoomName(roomIndex: number): string {
+  if (roomIndex === 0) {
+    return "Compute Hall";
+  }
+
+  return "Network Hall";
+}
+
+function getRowName(roomIndex: number, rowIndex: number): string {
+  const zone = roomIndex === 0 ? "A" : "B";
+
+  return `Row ${zone}${rowIndex + 1}`;
+}
+
+function getRackName(siteCode: string, roomIndex: number, rowIndex: number, rackIndex: number): string {
+  const zone = roomIndex === 0 ? "A" : "B";
+
+  return `${siteCode}-R${zone}${rowIndex + 1}-${String(rackIndex + 1).padStart(2, "0")}`;
+}
+
+function getHostnamePrefix(deviceType: Device["deviceType"]): string {
+  if (deviceType === "Firewall") {
+    return "FW";
+  }
+
+  if (deviceType === "Switch-ToR") {
+    return "SW";
+  }
+
+  if (deviceType === "Storage") {
+    return "NAS";
+  }
+
+  if (deviceType === "PDU") {
+    return "PDU";
+  }
+
+  if (deviceType === "Appliance-4U") {
+    return "HV";
+  }
+
+  return "SRV";
+}
+
+function getDeviceName(
+  deviceType: Device["deviceType"],
+  siteCode: string,
+  roomIndex: number,
+  rowIndex: number,
+  rackIndex: number,
+  deviceIndex: number,
+): string {
+  const prefix = getHostnamePrefix(deviceType);
+  const zone = roomIndex === 0 ? "A" : "B";
+
+  return `${prefix}-${siteCode}-${zone}${rowIndex + 1}${rackIndex + 1}-${String(deviceIndex + 1).padStart(2, "0")}`;
+}
+
+function getFacilityType(siteIndex: number, regionVariantIndex: number): string {
+  const facilitySelector = (siteIndex + regionVariantIndex) % 4;
+
+  if (facilitySelector === 0) {
+    return "Regional Data Center";
+  }
+
+  if (facilitySelector === 1) {
+    return "Corporate Data Center";
+  }
+
+  if (facilitySelector === 2) {
+    return "Colocation Facility";
+  }
+
+  return "Edge Facility";
+}
+
+function getCoolingStatus(siteHealthStatus: HealthStatus): string {
+  if (siteHealthStatus === "Critical") {
+    return "Degraded";
+  }
+
+  if (siteHealthStatus === "Warning") {
+    return "Watch";
+  }
+
+  if (siteHealthStatus === "Maintenance") {
+    return "Maintenance Window";
+  }
+
+  return "Stable";
+}
+
+function getNetworkStatus(siteHealthStatus: HealthStatus): string {
+  if (siteHealthStatus === "Critical" || siteHealthStatus === "Offline") {
+    return "Degraded";
+  }
+
+  if (siteHealthStatus === "Warning") {
+    return "Watch";
+  }
+
+  return "Nominal";
+}
+
+function getRackDeviceProfile(rackIndex: number): Device["deviceType"][] {
+  if (rackIndex === 0) {
+    return ["Server-2U", "Server-1U", "Server-1U", "Switch-ToR", "PDU"];
+  }
+
+  if (rackIndex === 1) {
+    return ["Server-2U", "Server-2U", "Storage", "Switch-ToR", "PDU"];
+  }
+
+  return ["Appliance-4U", "Server-1U", "Firewall", "Switch-ToR", "PDU"];
+}
+
+function buildExpandedMockTopology(): GeneratedTopology {
+  const generatedRegions: Region[] = [];
+  const generatedSites: Site[] = [];
+  const generatedRooms: Room[] = [];
+  const generatedRows: Row[] = [];
+  const generatedRacks: Rack[] = [];
+  const generatedDevices: Device[] = [];
+  const generatedSiteMetrics: Record<string, SiteMetricRecord> = {};
+  const generatedSiteMeta: Record<string, SiteMetaRecord> = {};
+  const generatedRackMetrics: Record<string, RackMetricRecord> = {};
+  const generatedRecentIssues: RecentIssue[] = [];
+
+  const regionExpansions = [
+    {
+      baseRegion: seedRegions[0],
+      variants: [
+        { idSuffix: "singapore", name: "AP-Southeast", code: "ASE", latitude: 1.3521, longitude: 103.8198 },
+        { idSuffix: "japan", name: "AP-Northeast", code: "ANE", latitude: 35.6762, longitude: 139.6503 },
+      ],
+      sites: [
+        { city: "Mumbai", country: "India", countryCode: "IN", latitude: 19.076, longitude: 72.8777 },
+        { city: "Bengaluru", country: "India", countryCode: "IN", latitude: 12.9716, longitude: 77.5946 },
+        { city: "Singapore", country: "Singapore", countryCode: "SG", latitude: 1.3521, longitude: 103.8198 },
+        { city: "Tokyo", country: "Japan", countryCode: "JP", latitude: 35.6762, longitude: 139.6503 },
+      ],
+    },
+    {
+      baseRegion: seedRegions[1],
+      variants: [
+        { idSuffix: "us-central", name: "US-Central", code: "UC", latitude: 41.8781, longitude: -87.6298 },
+      ],
+      sites: [
+        { city: "Ashburn", country: "United States", countryCode: "US", latitude: 39.0438, longitude: -77.4874 },
+        { city: "New York", country: "United States", countryCode: "US", latitude: 40.7128, longitude: -74.006 },
+        { city: "Chicago", country: "United States", countryCode: "US", latitude: 41.8781, longitude: -87.6298 },
+        { city: "Toronto", country: "Canada", countryCode: "CA", latitude: 43.6532, longitude: -79.3832 },
+      ],
+    },
+    {
+      baseRegion: seedRegions[2],
+      variants: [
+        { idSuffix: "eu-central", name: "EU-Central", code: "EC", latitude: 48.2082, longitude: 16.3738 },
+        { idSuffix: "uk-ireland", name: "UK-Ireland", code: "UK", latitude: 53.3498, longitude: -6.2603 },
+      ],
+      sites: [
+        { city: "Frankfurt", country: "Germany", countryCode: "DE", latitude: 50.1109, longitude: 8.6821 },
+        { city: "Amsterdam", country: "Netherlands", countryCode: "NL", latitude: 52.3676, longitude: 4.9041 },
+        { city: "Paris", country: "France", countryCode: "FR", latitude: 48.8566, longitude: 2.3522 },
+        { city: "Vienna", country: "Austria", countryCode: "AT", latitude: 48.2082, longitude: 16.3738 },
+      ],
+    },
+  ] as const;
+
+  const deviceTypes: Device["deviceType"][] = [
+    "Server-1U",
+    "Server-2U",
+    "Appliance-4U",
+    "Storage",
+    "Switch-ToR",
+    "Firewall",
+    "PDU",
+  ];
+
+  const osPlatforms = [
+    "Linux",
+    "Windows Server",
+    "Hypervisor",
+    "Network OS",
+    "Storage OS",
+    "Embedded",
+    "Security OS",
+  ] as const;
+
+  let issueCounter = 100;
+
+  regionExpansions.forEach((regionExpansion, regionIndex) => {
+    const regionVariants = [regionExpansion.baseRegion, ...regionExpansion.variants.map((variant) => ({
+      id: `region-${variant.idSuffix}`,
+      name: variant.name,
+      code: variant.code,
+      kind: "region" as const,
+      parentId: null,
+      healthStatus: "Healthy" as HealthStatus,
+      latitude: variant.latitude,
+      longitude: variant.longitude,
+    }))];
+
+    regionVariants.forEach((regionVariant, regionVariantIndex) => {
+      if (!seedRegions.some((seedRegion) => seedRegion.id === regionVariant.id)) {
+        generatedRegions.push(regionVariant);
+      }
+
+      regionExpansion.sites.forEach((siteTemplate, siteIndex) => {
+        const siteNumber = regionVariantIndex * regionExpansion.sites.length + siteIndex + 2;
+        const siteId = `site-${siteTemplate.city.toLowerCase().replace(/\s+/g, "-")}-dc${siteNumber}`;
+        const siteCode = getSiteCode(siteTemplate.countryCode, siteTemplate.city, siteNumber);
+        const siteName = `${siteTemplate.city} ${siteCode}`;
+        const siteHealthScore = (regionIndex * 2 + siteIndex * 2 + regionVariantIndex) % 10;
+        const siteHealthStatus = getHealthStatusFromScore(siteHealthScore);
+
+        if (seedSites.some((seedSite) => seedSite.id === siteId)) {
+          return;
+        }
+
+        const site: Site = {
+          id: siteId,
+          name: siteName,
+          kind: "site",
+          parentId: regionVariant.id,
+          regionId: regionVariant.id,
+          city: siteTemplate.city,
+          country: siteTemplate.country,
+          countryCode: siteTemplate.countryCode,
+          latitude: siteTemplate.latitude + regionVariantIndex * 0.18,
+          longitude: siteTemplate.longitude + siteIndex * 0.16,
+          healthStatus: siteHealthStatus,
+        };
+
+        generatedSites.push(site);
+
+        const facilityType = getFacilityType(siteIndex, regionVariantIndex);
+        const coolingStatus = getCoolingStatus(siteHealthStatus);
+        const networkStatus = getNetworkStatus(siteHealthStatus);
+        const occupancy = clampValue(52 + ((siteIndex + regionVariantIndex) % 5) * 6 + regionIndex * 2, 44, 86);
+        const avgTemp = clampValue(23 + regionIndex + (siteIndex % 4), 22, 33);
+        const powerUtilization = clampValue(46 + siteIndex * 4 + regionVariantIndex * 3, 38, 82);
+        const activeAlerts =
+          siteHealthStatus === "Critical"
+            ? 7 + (siteIndex % 3)
+            : siteHealthStatus === "Warning"
+              ? 3 + (siteIndex % 3)
+              : siteHealthStatus === "Maintenance"
+                ? 1
+                : siteHealthStatus === "Offline"
+                  ? 4
+                  : siteIndex % 2;
+
+        generatedSiteMetrics[site.id] = {
+          occupancy,
+          avgTemp,
+          powerUtilization,
+          activeAlerts,
+        };
+
+        generatedSiteMeta[site.id] = {
+          facilityType,
+          powerCapacity: `${1.4 + (siteIndex % 4) * 0.35 + regionVariantIndex * 0.2} MW`,
+          coolingStatus,
+          lastSync: `${1 + ((siteIndex + regionVariantIndex) % 4)} min ago`,
+          networkStatus,
+          availability: `${99.81 + ((siteIndex + regionIndex) % 12) / 100}%`,
+        };
+
+        for (let roomIndex = 0; roomIndex < 2; roomIndex += 1) {
+          const roomId = `room-${site.id}-${String.fromCharCode(97 + roomIndex)}`;
+          const roomHealthStatus = getHealthStatusFromScore((siteHealthScore + roomIndex + 2) % 10);
+          const room: Room = {
+            id: roomId,
+            name: getRoomName(roomIndex),
+            kind: "room",
+            parentId: site.id,
+            siteId: site.id,
+            healthStatus: roomHealthStatus,
+          };
+
+          generatedRooms.push(room);
+
+          for (let rowIndex = 0; rowIndex < 2; rowIndex += 1) {
+            const rowId = `row-${site.id}-${roomIndex + 1}-${rowIndex + 1}`;
+            const rowHealthStatus = getHealthStatusFromScore((siteHealthScore + roomIndex + rowIndex) % 10);
+            const row: Row = {
+              id: rowId,
+              name: getRowName(roomIndex, rowIndex),
+              kind: "row",
+              parentId: room.id,
+              roomId: room.id,
+              healthStatus: rowHealthStatus,
+            };
+
+            generatedRows.push(row);
+
+            for (let rackIndex = 0; rackIndex < 3; rackIndex += 1) {
+              const rackId = `rack-${site.id}-${roomIndex + 1}${rowIndex + 1}-${String(rackIndex + 1).padStart(2, "0")}`;
+              const rackHealthStatus = getHealthStatusFromScore((siteHealthScore + roomIndex + rowIndex + rackIndex + 3) % 10);
+              const occupancyPercent = clampValue(42 + rackIndex * 9 + roomIndex * 6 + rowIndex * 4, 34, 89);
+              const rack: Rack = {
+                id: rackId,
+                name: getRackName(siteCode, roomIndex, rowIndex, rackIndex),
+                kind: "rack",
+                parentId: row.id,
+                rowId: row.id,
+                totalUnits: 42,
+                occupancyPercent,
+                healthStatus: rackHealthStatus,
+              };
+
+              generatedRacks.push(rack);
+
+              generatedRackMetrics[rack.id] = {
+                powerLoadKw: Number((3.9 + roomIndex * 0.7 + rowIndex * 0.4 + rackIndex * 0.8).toFixed(1)),
+                temperatureState: rackHealthStatus === "Critical" ? "Hot Zone" : rackHealthStatus === "Warning" ? "Elevated" : "Stable",
+                recentAlerts:
+                  rackHealthStatus === "Critical"
+                    ? ["Thermal threshold breach", "Power draw sustained above baseline"]
+                    : rackHealthStatus === "Warning"
+                      ? ["Utilization above recommended baseline"]
+                      : ["No actionable alerts"],
+              };
+
+              const deviceProfile = getRackDeviceProfile(rackIndex);
+              const deviceCount = deviceProfile.length;
+
+              for (let deviceIndex = 0; deviceIndex < deviceCount; deviceIndex += 1) {
+                const deviceType = deviceProfile[deviceIndex] ?? deviceTypes[(deviceIndex + rackIndex + rowIndex) % deviceTypes.length];
+                const rackUnitSize =
+                  deviceType === "Appliance-4U" || deviceType === "Storage"
+                    ? 4
+                    : deviceType === "Server-2U" || deviceType === "Firewall" || deviceType === "PDU"
+                      ? 2
+                      : 1;
+                const rackUnitStart = Math.max(1, 42 - (deviceIndex * 6 + rackUnitSize));
+                const deviceHealthStatus = getHealthStatusFromScore((siteHealthScore + roomIndex + rowIndex + rackIndex + deviceIndex + 4) % 10);
+                const cpuUsage = clampValue(12 + deviceIndex * 9 + rackIndex * 4, 3, 91);
+                const memoryUsage = clampValue(18 + deviceIndex * 8 + roomIndex * 5, 6, 93);
+                const temperature = deviceType === "PDU" ? 26 + rowIndex : clampValue(avgTemp + deviceIndex % 5 + rackIndex, 24, 43);
+                const alertCount =
+                  deviceHealthStatus === "Critical"
+                    ? 3 + (deviceIndex % 2)
+                    : deviceHealthStatus === "Warning"
+                      ? 1 + (deviceIndex % 2)
+                      : deviceHealthStatus === "Offline"
+                        ? 2
+                        : 0;
+                const inboundMbps = 40 + deviceIndex * 16 + rackIndex * 14;
+                const outboundMbps = 24 + deviceIndex * 12 + rowIndex * 10;
+                const osPlatform = osPlatforms[(deviceIndex + regionIndex + regionVariantIndex) % osPlatforms.length];
+                const deviceId = `device-${site.id}-${roomIndex + 1}${rowIndex + 1}${rackIndex + 1}-${String(deviceIndex + 1).padStart(2, "0")}`;
+                const device: Device = {
+                  id: deviceId,
+                  name: getDeviceName(deviceType, siteCode, roomIndex, rowIndex, rackIndex, deviceIndex),
+                  kind: "device",
+                  parentId: rack.id,
+                  rackId: rack.id,
+                  rackUnitStart,
+                  rackUnitSize,
+                  deviceType,
+                  ipAddress: `10.${10 + regionIndex}.${regionVariantIndex * 30 + siteIndex + 10}.${deviceIndex + rackIndex + 10}`,
+                  osPlatform,
+                  cpuUsage,
+                  memoryUsage,
+                  networkIo: formatNetworkIo(inboundMbps, outboundMbps),
+                  temperature: deviceType === "Blank-Panel" ? 0 : temperature,
+                  uptime: deviceHealthStatus === "Offline" ? "0d 0h" : formatUptime(28 + deviceIndex * 9 + rackIndex * 4, (deviceIndex + roomIndex) % 24),
+                  alertCount,
+                  powerState: deviceHealthStatus === "Offline" ? "Off" : deviceHealthStatus === "Maintenance" ? "Standby" : "On",
+                  healthStatus: deviceHealthStatus,
+                };
+
+                generatedDevices.push(device);
+              }
+
+                if (rackHealthStatus === "Critical" || rackHealthStatus === "Warning") {
+                  issueCounter += 1;
+                  generatedRecentIssues.push({
+                    id: `iss-${issueCounter}`,
+                    entityId: rack.id,
+                    severity: rackHealthStatus === "Critical" ? "Critical" : "Warning",
+                    text:
+                      rackHealthStatus === "Critical"
+                        ? `Repeated thermal alarms in ${rack.name}`
+                        : `Capacity pressure increasing in ${rack.name}`,
+                    time: `${2 + ((roomIndex + rowIndex + rackIndex) % 45)}m ago`,
+                  });
+                }
+            }
+          }
+        }
+      });
+    });
+  });
+
+  return {
+    regions: generatedRegions,
+    sites: generatedSites,
+    rooms: generatedRooms,
+    rows: generatedRows,
+    racks: generatedRacks,
+    devices: generatedDevices,
+    siteMetrics: generatedSiteMetrics,
+    siteMeta: generatedSiteMeta,
+    rackMetrics: generatedRackMetrics,
+    recentIssues: generatedRecentIssues,
+  };
+}
+
+const expandedTopology = buildExpandedMockTopology();
+
+const regions: Region[] = [...seedRegions, ...expandedTopology.regions];
+const sites: Site[] = [...seedSites, ...expandedTopology.sites];
+const rooms: Room[] = [...seedRooms, ...expandedTopology.rooms];
+const rows: Row[] = [...seedRows, ...expandedTopology.rows];
+const racks: Rack[] = [...seedRacks, ...expandedTopology.racks];
+const devices: Device[] = [...seedDevices, ...expandedTopology.devices];
+
+const siteMetrics: Record<string, SiteMetricRecord> = {
+  ...seedSiteMetrics,
+  ...expandedTopology.siteMetrics,
+};
+
+const siteMeta: Record<string, SiteMetaRecord> = {
+  ...seedSiteMeta,
+  ...expandedTopology.siteMeta,
+};
+
+const rackMetrics: Record<string, RackMetricRecord> = {
+  ...seedRackMetrics,
+  ...expandedTopology.rackMetrics,
+};
+
+const recentIssues: RecentIssue[] = [...seedRecentIssues, ...expandedTopology.recentIssues];
 
 const allEntities: RackVisionEntity[] = [...regions, ...sites, ...rooms, ...rows, ...racks, ...devices];
 
@@ -572,7 +1096,14 @@ function getCountrySummarySync(countryCode: string): CountryInfrastructureSummar
       )
     : 0;
 
-  const healthStatus: HealthStatus = critical > 0 ? "Critical" : warning > 0 ? "Warning" : countrySites.length ? "Healthy" : "Maintenance";
+  let healthStatus: HealthStatus = "Maintenance";
+  if (critical > 0) {
+    healthStatus = "Critical";
+  } else if (warning > 0) {
+    healthStatus = "Warning";
+  } else if (countrySites.length > 0) {
+    healthStatus = "Healthy";
+  }
 
   return {
     countryCode: code,
@@ -612,6 +1143,13 @@ function getSiteSummarySync(siteId: string): SiteSummary {
     powerUtilization: metrics?.powerUtilization ?? 0,
     healthScore: Math.max(0, 100 - siteDevices.filter((device) => device.healthStatus !== "Healthy").length * 8),
   };
+}
+
+function getSiteAncestor(entityId: string): Site | undefined {
+  const ancestorIds = collectAncestorIds(entityId);
+  const siteId = ancestorIds.find((id) => sites.some((site) => site.id === id));
+  if (!siteId) return undefined;
+  return sites.find((site) => site.id === siteId);
 }
 
 function getSiteIdForEntity(entity: RackVisionEntity): string | null {
@@ -1270,7 +1808,7 @@ export const MockDataService = {
       racks: countByKind(entityId, "rack"),
       devices: countByKind(entityId, "device"),
     };
-    const site = entity.kind === "site" ? entity : getRegionForEntity(entity)?.id ? sites.find((item) => item.id === collectAncestorIds(entity.id).find((id) => sites.some((s) => s.id === id))) : undefined;
+    const site = entity.kind === "site" ? entity : getSiteAncestor(entity.id);
     const selectedSiteMetrics = site ? siteMetrics[site.id] : undefined;
     const selectedRackMetrics = entity.kind === "rack" ? rackMetrics[entity.id] : undefined;
     const issueItems = recentIssues.filter((issue) => issue.entityId === entity.id || collectAncestorIds(issue.entityId).includes(entity.id)).slice(0, 4);

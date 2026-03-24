@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import {
   Activity,
   BadgeCheck,
@@ -22,13 +23,18 @@ import {
 export type NavItem = {
   label: string;
   to?: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   children?: { label: string; to: string }[];
 };
 
 export type NavGroup = {
   label: string;
   items: NavItem[];
+};
+
+type QuickLink = {
+  label: string;
+  icon: ComponentType<{ className?: string }>;
 };
 
 export const navGroups: NavGroup[] = [
@@ -66,7 +72,7 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-export const topbarQuickLinks = [
+export const topbarQuickLinks: QuickLink[] = [
   { label: "Operations", icon: Gauge },
   { label: "Global", icon: Globe },
   { label: "Health", icon: Activity },

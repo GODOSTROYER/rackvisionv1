@@ -6,12 +6,14 @@ import { GlobalSummaryCards } from "@/components/rackvision/GlobalSummaryCards";
 import { GlobalViewEmptyState } from "@/components/rackvision/GlobalViewEmptyState";
 import { GlobalViewSkeleton } from "@/components/rackvision/GlobalViewSkeleton";
 import { InfrastructureGlobe } from "@/components/rackvision/InfrastructureGlobe";
+import { MapboxInfrastructureGlobe } from "@/components/rackvision/MapboxInfrastructureGlobe";
 import { RegionSummaryPanel } from "@/components/rackvision/RegionSummaryPanel";
 import { SelectionHintBanner } from "@/components/rackvision/SelectionHintBanner";
 import { SiteInfrastructureOverlay } from "@/components/rackvision/SiteInfrastructureOverlay";
 import { SiteOverviewCanvas } from "@/components/rackvision/SiteOverviewCanvas";
 import { GlobalSummary, GlobeMarker, RackVisionEntityKind, RegionSummary, SiteSummary } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MockDataService } from "@/services/rackvision/MockDataService";
 
 type GlobalInfrastructureViewProps = {
@@ -61,6 +63,7 @@ export function GlobalInfrastructureView({
   globalViewMode,
   onGlobalViewModeChange,
 }: GlobalInfrastructureViewProps) {
+  const [globeRenderer, setGlobeRenderer] = useState<"three" | "mapbox">("three");
   const [selectedCountryCode, setSelectedCountryCode] = useState<string | null>(null);
   const [countrySummary, setCountrySummary] = useState<Awaited<ReturnType<typeof MockDataService.getCountryInfrastructureSummary>> | null>(null);
   const [countrySites, setCountrySites] = useState<Awaited<ReturnType<typeof MockDataService.getCountrySites>>>([]);
@@ -101,6 +104,10 @@ export function GlobalInfrastructureView({
     }
   };
 
+  const handleCountrySelect = async (countryCode: string) => {
+    await loadCountryContext(countryCode);
+  };
+
   if (!forceGlobalView && selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
     return (
       <SiteOverviewCanvas
@@ -133,7 +140,29 @@ export function GlobalInfrastructureView({
           <Globe2 className="h-4 w-4" /> Global Infrastructure View
           {selectedEntityName ? <span className="text-muted-foreground">• {selectedEntityName}</span> : null}
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Renderer</span>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={globeRenderer}
+              onValueChange={(value) => {
+                if (value === "three" || value === "mapbox") {
+                  setGlobeRenderer(value);
+                }
+              }}
+              aria-label="Globe renderer"
+            >
+              <ToggleGroupItem value="three" aria-label="Use 3D globe renderer">
+                Globe
+              </ToggleGroupItem>
+              <ToggleGroupItem value="mapbox" aria-label="Use Mapbox globe renderer">
+                Mapbox
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <Button variant={globalViewMode === "regions" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("regions")} aria-pressed={globalViewMode === "regions"}>Regions</Button>
           <Button variant={globalViewMode === "sites" ? "default" : "outline"} size="sm" onClick={() => onGlobalViewModeChange("sites")} aria-pressed={globalViewMode === "sites"}>Sites</Button>
         </div>
@@ -142,18 +171,29 @@ export function GlobalInfrastructureView({
       <SelectionHintBanner text={hint} />
       <GlobalSummaryCards summary={summary} />
 
-      <InfrastructureGlobe
-        markers={markers}
-        selectedMarkerId={selectedMarkerId}
-        hoveredMarkerId={hoveredMarkerId}
-        selectedCountryCode={selectedCountryCode}
-        onHoverMarker={onHoverMarker}
-        onSelectMarker={onSelectMarker}
-        onSelectCountry={async (countryCode) => {
-          await loadCountryContext(countryCode);
-        }}
-        regionLookup={regionLookup}
-      />
+      {globeRenderer === "mapbox" ? (
+        <MapboxInfrastructureGlobe
+          markers={markers}
+          selectedMarkerId={selectedMarkerId}
+          hoveredMarkerId={hoveredMarkerId}
+          selectedCountryCode={selectedCountryCode}
+          onHoverMarker={onHoverMarker}
+          onSelectMarker={onSelectMarker}
+          onSelectCountry={handleCountrySelect}
+          regionLookup={regionLookup}
+        />
+      ) : (
+        <InfrastructureGlobe
+          markers={markers}
+          selectedMarkerId={selectedMarkerId}
+          hoveredMarkerId={hoveredMarkerId}
+          selectedCountryCode={selectedCountryCode}
+          onHoverMarker={onHoverMarker}
+          onSelectMarker={onSelectMarker}
+          onSelectCountry={handleCountrySelect}
+          regionLookup={regionLookup}
+        />
+      )}
 
       <GlobeLegend />
 

@@ -1,8 +1,17 @@
+import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
 import { AlertTriangle } from "lucide-react";
 import { EntityHoverSummaryCard } from "@/components/rackvision/EntityHoverSummaryCard";
-import { EntityHoverSummary, GlobeMarker as GlobeMarkerType } from "@/components/rackvision/types";
+import {
+  buildStatusTone,
+  buildThemePalette,
+  defaultGlobePalette,
+  markerToSummary,
+  normalizeCountryCode,
+  type GlobePalette,
+} from "@/components/rackvision/globeShared";
+import type { EntityHoverSummary, GlobeMarker as GlobeMarkerType } from "@/components/rackvision/types";
 import countriesGeoJson from "@/data/countries.json";
 import { normalizeGeoJsonFeatures, type GeoJsonFeature } from "@/lib/geojson";
 import { MockDataService } from "@/services/rackvision/MockDataService";
@@ -17,36 +26,6 @@ type InfrastructureGlobeProps = {
   onSelectCountry?: (countryCode: string) => void;
   regionLookup: Record<string, string>;
 };
-
-
-const countryAlias: Record<string, string> = {
-  "united states": "US",
-  "united states of america": "US",
-  usa: "US",
-  india: "IN",
-  germany: "DE",
-};
-
-function normalizeCssColor(input: string, fallback: string) {
-  if (typeof document === "undefined") return fallback;
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) return fallback;
-
-  context.fillStyle = fallback;
-  const fallbackColor = context.fillStyle;
-  context.fillStyle = fallback;
-  context.fillStyle = input;
-
-  return context.fillStyle || fallbackColor || fallback;
-}
-
-function normalizeCountryCode(name: string, rawCode: string | undefined) {
-  const code = rawCode?.trim().toUpperCase();
-  if (code && code.length === 2 && code !== "-99") return code;
-  return countryAlias[name.toLowerCase()] ?? name.slice(0, 2).toUpperCase();
-}
-
 
 type GlobeController = {
   globeMaterial?: () => {
@@ -72,30 +51,13 @@ type GlobeController = {
 
 type CountryFeature = GeoJsonFeature;
 
-function markerToSummary(marker: GlobeMarkerType, regionLookup: Record<string, string>): EntityHoverSummary {
-  return {
-    id: marker.id,
-    kind: marker.kind,
-    title: marker.name,
-    subtitle:
-      marker.kind === "site"
-        ? `${marker.city ?? "Unknown City"}, ${marker.country ?? "Unknown Country"}`
-        : marker.regionId
-          ? regionLookup[marker.regionId]
-          : "Region",
-    healthStatus: marker.healthStatus,
-    metrics: [
-      ...(marker.kind === "region" ? [{ label: "Sites", value: marker.metrics.sites ?? 0 }] : []),
-      ...(typeof marker.metrics.rooms === "number" ? [{ label: "Rooms", value: marker.metrics.rooms }] : []),
-      ...(typeof marker.metrics.rows === "number" ? [{ label: "Rows", value: marker.metrics.rows }] : []),
-      { label: "Racks", value: marker.metrics.racks },
-      { label: "Devices", value: marker.metrics.devices },
-      { label: "Warning", value: marker.metrics.warning },
-      { label: "Critical", value: marker.metrics.critical },
-      { label: "Alerts", value: marker.metrics.activeAlerts },
-      ...(typeof marker.metrics.occupancyPercent === "number" ? [{ label: "Occupancy", value: `${marker.metrics.occupancyPercent}%` }] : []),
-    ],
-  };
+function getPointDiagnosticsText(countryCount: number, renderedPoints: number): ReactElement {
+  return (
+    <>
+      Polygons: <span className="font-medium text-foreground">{countryCount}</span> · Points:{" "}
+      <span className="font-medium text-foreground">{renderedPoints}</span>
+    </>
+  );
 }
 
 export function InfrastructureGlobe({
@@ -107,48 +69,17 @@ export function InfrastructureGlobe({
   onSelectMarker,
   onSelectCountry,
   regionLookup,
-}: InfrastructureGlobeProps) {
+}: InfrastructureGlobeProps): ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const globeRef = useRef<GlobeController | null>(null);
   const hoveredMarkerIdRef = useRef<string | null>(null);
   const [size, setSize] = useState({ width: 640, height: 460 });
   const [hoveredCountry, setHoveredCountry] = useState<{ code: string; name: string } | null>(null);
   const [countrySummaryCache, setCountrySummaryCache] = useState<Record<string, EntityHoverSummary>>({});
-  const [palette, setPalette] = useState({
-    ocean: "#3d6d9e",
-    atmosphere: "#97d8fb",
-    land: "rgba(109, 216, 232, 0.92)",
-    landHovered: "rgba(120, 238, 247, 0.98)",
-    landSelected: "rgba(255, 216, 112, 0.98)",
-    border: "rgba(255, 255, 255, 0.52)",
-    borderActive: "rgba(255, 234, 179, 0.98)",
-    healthy: "#2fb55d",
-    warning: "#d99210",
-    critical: "#dc3c3c",
-    offline: "#667085",
-    maintenance: "#7a8797",
-  });
+  const [palette, setPalette] = useState<GlobePalette>(defaultGlobePalette);
 
   useEffect(() => {
-    const root = window.getComputedStyle(document.documentElement);
-    const readVar = (token: string, fallback: string) => {
-      const value = root.getPropertyValue(token).trim();
-      return normalizeCssColor(value ? `hsl(${value})` : fallback, fallback);
-    };
-    setPalette({
-      ocean: readVar("--secondary", "#3d6d9e"),
-      atmosphere: readVar("--accent", "#97d8fb"),
-      land: "rgba(109, 216, 232, 0.92)",
-      landHovered: "rgba(120, 238, 247, 0.98)",
-      landSelected: "rgba(255, 216, 112, 0.98)",
-      border: "rgba(255, 255, 255, 0.52)",
-      borderActive: "rgba(255, 234, 179, 0.98)",
-      healthy: readVar("--healthy", "#2fb55d"),
-      warning: readVar("--warning", "#d99210"),
-      critical: readVar("--critical", "#dc3c3c"),
-      offline: readVar("--offline", "#667085"),
-      maintenance: readVar("--muted-foreground", "#7a8797"),
-    });
+    setPalette(buildThemePalette());
   }, []);
 
   useEffect(() => {
@@ -176,20 +107,21 @@ export function InfrastructureGlobe({
   const countryData = useMemo(() => normalizeGeoJsonFeatures(countriesGeoJson), []);
   const countries = countryData.features;
   const countryCount = countries.length;
+  const diagnostics = countryData.diagnostics;
 
   useEffect(() => {
     console.log("[InfrastructureGlobe] country polygon source", {
-      sourceKind: countryData.diagnostics.sourceKind,
-      totalFeatures: countryData.diagnostics.totalFeatures,
-      polygonCount: countryData.diagnostics.polygonFeatures,
-      totalPoints: countryData.diagnostics.totalPoints,
-      renderedPoints: countryData.diagnostics.renderedPoints,
-      firstFeature: countryData.diagnostics.firstFeature,
+      sourceKind: diagnostics.sourceKind,
+      totalFeatures: diagnostics.totalFeatures,
+      polygonCount: diagnostics.polygonFeatures,
+      totalPoints: diagnostics.totalPoints,
+      renderedPoints: diagnostics.renderedPoints,
+      firstFeature: diagnostics.firstFeature,
     });
-  }, [countryData]);
+  }, [diagnostics]);
 
-  const countryCodeFor = useCallback((feature: CountryFeature) => {
-    const props = feature?.properties ?? {};
+  const countryCodeFor = useCallback(function getCountryCodeForFeature(feature: CountryFeature) {
+    const props = feature.properties ?? {};
     const countryName = String(props.ADMIN ?? props.NAME ?? props.name ?? props.NAME_EN ?? "Unknown");
     const countryCode = normalizeCountryCode(
       countryName,
@@ -198,7 +130,7 @@ export function InfrastructureGlobe({
     return { countryCode, countryName };
   }, []);
 
-  const setHoveredCountrySafe = useCallback((next: { code: string; name: string } | null) => {
+  const setHoveredCountrySafe = useCallback(function updateHoveredCountry(next: { code: string; name: string } | null) {
     setHoveredCountry((previous) => {
       if (previous?.code === next?.code && previous?.name === next?.name) return previous;
       return next;
@@ -238,16 +170,7 @@ export function InfrastructureGlobe({
   const hoveredMarker = markers.find((marker) => marker.id === hoveredMarkerId) ?? null;
   const markerSummary = hoveredMarker ? markerToSummary(hoveredMarker, regionLookup) : null;
   const countrySummary = activeCountryCode ? countrySummaryCache[activeCountryCode] : null;
-  const statusTone = useMemo<Record<GlobeMarkerType["healthStatus"], string>>(
-    () => ({
-      Healthy: palette.healthy,
-      Warning: palette.warning,
-      Critical: palette.critical,
-      Offline: palette.offline,
-      Maintenance: palette.maintenance,
-    }),
-    [palette],
-  );
+  const statusTone = useMemo(() => buildStatusTone(palette), [palette]);
 
   useEffect(() => {
     const controls = globeRef.current?.controls?.();
@@ -302,15 +225,22 @@ export function InfrastructureGlobe({
     [countryCodeFor, hoveredCountry?.code, selectedCountryCode],
   );
 
-  const pointColor = useCallback((marker: GlobeMarkerType) => statusTone[marker.healthStatus], [statusTone]);
+  const pointColor = useCallback(function getPointColor(marker: GlobeMarkerType): string {
+    return statusTone[marker.healthStatus];
+  }, [statusTone]);
 
   const pointAltitude = useCallback(
-    (marker: GlobeMarkerType) => (marker.id === selectedMarkerId ? 0.26 : marker.healthStatus === "Critical" ? 0.22 : marker.healthStatus === "Warning" ? 0.2 : 0.18),
+    function getPointAltitude(marker: GlobeMarkerType): number {
+      if (marker.id === selectedMarkerId) return 0.26;
+      if (marker.healthStatus === "Critical") return 0.22;
+      if (marker.healthStatus === "Warning") return 0.2;
+      return 0.18;
+    },
     [selectedMarkerId],
   );
 
   const pointRadius = useCallback(
-    (marker: GlobeMarkerType) => {
+    function getPointRadius(marker: GlobeMarkerType): number {
       if (marker.id === selectedMarkerId) return 0.82;
       if (marker.healthStatus === "Critical") return 0.72;
       if (marker.healthStatus === "Warning") return 0.66;
@@ -355,7 +285,9 @@ export function InfrastructureGlobe({
           polygonsData={countries}
           polygonsTransitionDuration={0}
           polygonCapColor={polygonCapColor}
-          polygonSideColor={() => "rgba(16, 92, 115, 0.9)"}
+          polygonSideColor={function getPolygonSideColor() {
+            return "rgba(16, 92, 115, 0.9)";
+          }}
           polygonStrokeColor={polygonStrokeColor}
           polygonCapCurvatureResolution={8}
           polygonAltitude={polygonAltitude}
@@ -390,13 +322,13 @@ export function InfrastructureGlobe({
             <div>
               <div className="font-medium">Country polygon data failed to load.</div>
               <div className="mt-1 text-[11px] text-muted-foreground">
-                Source: {countryData.diagnostics.sourceKind}. Total features: {countryData.diagnostics.totalFeatures}. Rendered points: {countryData.diagnostics.renderedPoints}.
+                Source: {diagnostics.sourceKind}. Total features: {diagnostics.totalFeatures}. Rendered points: {diagnostics.renderedPoints}.
               </div>
             </div>
           </div>
         ) : (
           <div className="absolute left-3 top-3 z-20 rounded-md border border-border/70 bg-background/85 px-3 py-2 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
-            Polygons: <span className="font-medium text-foreground">{countryCount}</span> · Points: <span className="font-medium text-foreground">{countryData.diagnostics.renderedPoints}</span>
+            {getPointDiagnosticsText(countryCount, diagnostics.renderedPoints)}
           </div>
         )}
 

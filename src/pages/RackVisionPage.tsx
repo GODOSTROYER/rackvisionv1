@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { BreadcrumbBar } from "@/components/rackvision/BreadcrumbBar";
 import { FilterBarPlaceholder } from "@/components/rackvision/FilterBarPlaceholder";
 import { GlobalInfrastructureView } from "@/components/rackvision/GlobalInfrastructureView";
+import { HierarchyFocusCanvas } from "@/components/rackvision/HierarchyFocusCanvas";
 import { HierarchyPanel } from "@/components/rackvision/HierarchyPanel";
 import { InspectorPanel } from "@/components/rackvision/InspectorPanel";
 import { LayoutViewCanvas } from "@/components/rackvision/LayoutViewCanvas";
@@ -28,11 +29,49 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { MockDataService } from "@/services/rackvision/MockDataService";
 
+function getViewForEntityKind(kind: RackVisionEntityKind | null | undefined): RackVisionViewMode {
+  if (kind === "rack" || kind === "device") return "rack";
+  if (kind === "site" || kind === "room" || kind === "row") return "site";
+  return "global";
+}
+
+function getInitialRouteView(params: { rackParam?: string; siteParam?: string }): RackVisionViewMode {
+  if (params.rackParam) return "rack";
+  if (params.siteParam) return "site";
+  return "global";
+}
+
+function canKeepCurrentView(view: RackVisionViewMode, kind: RackVisionEntityKind | null | undefined): boolean {
+  if (view === "hierarchy" || view === "global" || view === "site") {
+    return true;
+  }
+
+  if (view === "layout") {
+    return kind !== "region" && kind !== null;
+  }
+
+  if (view === "rack") {
+    return kind === "rack" || kind === "device";
+  }
+
+  return false;
+}
+
+function getViewForSelection(currentView: RackVisionViewMode, kind: RackVisionEntityKind | null | undefined): RackVisionViewMode {
+  if (canKeepCurrentView(currentView, kind)) {
+    return currentView;
+  }
+
+  return getViewForEntityKind(kind);
+}
+
 function RackVisionWorkspace() {
   const { state, dispatch } = useRackVision();
   const navigate = useNavigate();
   const { regionId: regionParam, siteId: siteParam, rackId: rackParam } = useParams();
+  const pendingRouteViewRef = useRef<RackVisionViewMode | null>(null);
 
+  const [initialLoading, setInitialLoading] = useState(true);
   const [tree, setTree] = useState<HierarchyNode[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [allSites, setAllSites] = useState<{ id: string; name: string }[]>([]);
@@ -80,15 +119,30 @@ function RackVisionWorkspace() {
     return "/dashboard/rackvision";
   };
 
+  const clearSelectionState = (nextView: RackVisionViewMode) => {
+    dispatch({ type: "SET_SELECTED_ENTITY", payload: { id: null, kind: null } });
+    dispatch({ type: "SET_INSPECTOR_ENTITY", payload: null });
+    dispatch({ type: "SET_SELECTED_MARKER", payload: null });
+    dispatch({ type: "SET_HOVERED_ENTITY", payload: null });
+    dispatch({ type: "SET_SELECTED_ROOM", payload: null });
+    dispatch({ type: "SET_SELECTED_ROW", payload: null });
+    dispatch({ type: "SET_SELECTED_RACK", payload: null });
+    dispatch({ type: "SET_SELECTED_DEVICE", payload: null });
+    dispatch({ type: "SET_ACTIVE_RACK", payload: null });
+    dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: null, roomId: null } });
+    dispatch({ type: "SET_ACTIVE_VIEW", payload: nextView });
+    dispatch({ type: "CLOSE_RACK_PREVIEW" });
+    dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
+    setSites(allSites);
+  };
+
   const selectEntity = async (
     id: string | null,
     options?: { kindOverride?: RackVisionEntityKind | null; updateRoute?: boolean; nextView?: RackVisionViewMode; fallbackSites?: { id: string; name: string }[] },
   ) => {
     if (!id) return null;
-    dispatch({ type: "SET_LOADING", payload: true });
     const context = await MockDataService.getEntityContext(id);
     if (!context) {
-      dispatch({ type: "SET_LOADING", payload: false });
       return null;
     }
 
@@ -108,14 +162,16 @@ function RackVisionWorkspace() {
     if (kind !== "rack" && kind !== "device") dispatch({ type: "CLOSE_RACK_PREVIEW" });
 
     await setSiteOptionsForContext(context, options?.fallbackSites);
-    if (options?.updateRoute !== false) navigate(getRouteForSelection(context, kind));
-    dispatch({ type: "SET_LOADING", payload: false });
+    if (options?.updateRoute !== false) {
+      pendingRouteViewRef.current = options?.nextView ?? null;
+      navigate(getRouteForSelection(context, kind), { preventScrollReset: true });
+    }
     return context;
   };
 
   useEffect(() => {
     const load = async () => {
-      dispatch({ type: "SET_LOADING", payload: true });
+      setInitialLoading(true);
       const [loadedRegions, loadedTree, summary, allSites] = await Promise.all([
         MockDataService.getRegions(),
         MockDataService.getHierarchyTree(),
@@ -128,20 +184,53 @@ function RackVisionWorkspace() {
       const siteOptions = allSites.map((site) => ({ id: site.id, name: site.name }));
       setAllSites(siteOptions);
       setSites(siteOptions);
-
-      if (routeEntityId) {
-        await selectEntity(routeEntityId, {
-          updateRoute: false,
-          nextView: rackParam ? "rack" : siteParam ? "site" : "global",
-          fallbackSites: siteOptions,
-        });
-      } else {
-        dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
-        dispatch({ type: "SET_LOADING", payload: false });
-      }
+      setInitialLoading(false);
     };
     load();
-  }, [dispatch, rackParam, regionParam, routeEntityId, siteParam]);
+  }, []);
+
+  useEffect(() => {
+    if (initialLoading) {
+      return;
+    }
+
+    const syncRouteSelection = async () => {
+      const pendingView = pendingRouteViewRef.current;
+
+      if (routeEntityId) {
+        if (routeEntityId === state.selectedEntityId) {
+          if (pendingView) {
+            dispatch({ type: "SET_ACTIVE_VIEW", payload: pendingView });
+          }
+          pendingRouteViewRef.current = null;
+          return;
+        }
+
+        const routeView = pendingView ?? getInitialRouteView({ rackParam, siteParam });
+        pendingRouteViewRef.current = null;
+        await selectEntity(routeEntityId, {
+          updateRoute: false,
+          nextView: routeView,
+          fallbackSites: allSites,
+        });
+        return;
+      }
+
+      const nextView = pendingView ?? (state.activeView === "hierarchy" ? "hierarchy" : "global");
+      pendingRouteViewRef.current = null;
+
+      if (!state.selectedEntityId) {
+        if (pendingView) {
+          dispatch({ type: "SET_ACTIVE_VIEW", payload: nextView });
+        }
+        return;
+      }
+
+      clearSelectionState(nextView);
+    };
+
+    syncRouteSelection();
+  }, [allSites, dispatch, initialLoading, rackParam, routeEntityId, siteParam, state.activeView, state.selectedEntityId]);
 
   useEffect(() => {
     const loadGlobal = async () => {
@@ -219,31 +308,21 @@ function RackVisionWorkspace() {
   };
 
   const handleRegionChange = async (regionId: string) => {
-    await selectEntity(regionId, { kindOverride: "region", nextView: "global" });
+    await selectEntity(regionId, { kindOverride: "region", nextView: getViewForSelection(state.activeView, "region") });
   };
 
   const handleSiteChange = async (siteId: string) => {
-    await selectEntity(siteId, { kindOverride: "site", nextView: "site" });
+    await selectEntity(siteId, { kindOverride: "site", nextView: getViewForSelection(state.activeView, "site") });
   };
 
   const handleEntitySelect = async (entityId: string) => {
     const entity = await MockDataService.getEntityById(entityId);
-    const nextView =
-      entity?.kind === "rack" || entity?.kind === "device"
-        ? "rack"
-        : entity?.kind === "site" || entity?.kind === "room" || entity?.kind === "row"
-          ? "site"
-          : "global";
+    const nextView = getViewForSelection(state.activeView, entity?.kind);
     await selectEntity(entityId, { nextView });
   };
 
   const handleSearchResultSelect = async (result: RackVisionSearchResult) => {
-    const nextView =
-      result.kind === "rack" || result.kind === "device"
-        ? "rack"
-        : result.kind === "site" || result.kind === "room" || result.kind === "row"
-          ? "site"
-          : "global";
+    const nextView = getViewForEntityKind(result.kind);
     await selectEntity(result.id, { kindOverride: result.kind, nextView });
     dispatch({ type: "CLOSE_SEARCH_RESULTS" });
     dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: result.name });
@@ -266,30 +345,14 @@ function RackVisionWorkspace() {
 
   const handleBreadcrumbSelect = async (id: string) => {
     if (id === "global") {
-      dispatch({ type: "SET_SELECTED_ENTITY", payload: { id: null, kind: null } });
-      dispatch({ type: "SET_INSPECTOR_ENTITY", payload: null });
-      dispatch({ type: "SET_SELECTED_MARKER", payload: null });
-      dispatch({ type: "SET_HOVERED_ENTITY", payload: null });
-      dispatch({ type: "SET_SELECTED_ROOM", payload: null });
-      dispatch({ type: "SET_SELECTED_ROW", payload: null });
-      dispatch({ type: "SET_SELECTED_RACK", payload: null });
-      dispatch({ type: "SET_SELECTED_DEVICE", payload: null });
-      dispatch({ type: "SET_ACTIVE_RACK", payload: null });
-      dispatch({ type: "SET_LAYOUT_CONTEXT", payload: { siteId: null, roomId: null } });
-      dispatch({ type: "SET_ACTIVE_VIEW", payload: "global" });
-      dispatch({ type: "CLOSE_RACK_PREVIEW" });
-      dispatch({ type: "SET_BREADCRUMBS", payload: [{ id: "global", label: "Global", kind: "global" }] });
-      setSites(allSites);
-      navigate("/dashboard/rackvision");
+      const nextView = state.activeView === "hierarchy" ? "hierarchy" : "global";
+      clearSelectionState(nextView);
+      pendingRouteViewRef.current = nextView;
+      navigate("/dashboard/rackvision", { preventScrollReset: true });
       return;
     }
     const crumb = state.breadcrumbs.find((item) => item.id === id);
-    const nextView =
-      crumb?.kind === "rack" || crumb?.kind === "device"
-        ? "rack"
-        : crumb?.kind === "site" || crumb?.kind === "room" || crumb?.kind === "row"
-          ? "site"
-          : "global";
+    const nextView = getViewForSelection(state.activeView, crumb?.kind ?? null);
     await selectEntity(id, { kindOverride: crumb?.kind ?? null, nextView });
   };
 
@@ -349,9 +412,11 @@ function RackVisionWorkspace() {
 
     if (state.activeView === "hierarchy") {
       return (
-        <RouteFallbackState
-          title="Hierarchy focus mode"
-          description="Use the left panel to navigate entities; inspector and breadcrumbs remain fully synchronized while canvas stays low-noise."
+        <HierarchyFocusCanvas
+          nodes={tree}
+          selectedEntityId={state.selectedEntityId}
+          onSelectEntity={handleEntitySelect}
+          onOpenDevice={handleOpenDevice}
         />
       );
     }
@@ -387,51 +452,54 @@ function RackVisionWorkspace() {
   };
 
   return (
-    <section className="space-y-4">
-      <RackVisionHeader
-        searchQuery={state.globalSearchQuery}
-        searchResults={state.globalSearchResults}
-        isSearchOpen={state.isSearchResultsOpen}
-        onSearchOpenChange={(open) => dispatch({ type: open ? "OPEN_SEARCH_RESULTS" : "CLOSE_SEARCH_RESULTS" })}
-        onSearchQueryChange={(value) => {
-          dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: value });
-          if (!state.isSearchResultsOpen) dispatch({ type: "OPEN_SEARCH_RESULTS" });
-          dispatch({ type: "SET_TREE_SEARCH", payload: value });
-          handleSearch(value);
-        }}
-        onSearchResultSelect={handleSearchResultSelect}
-        regionId={selectedRegionId}
-        siteId={selectedSiteId}
-        regions={regions}
-        sites={sites}
-        onRegionChange={handleRegionChange}
-        onSiteChange={handleSiteChange}
-        onRefresh={() => {
-          toast({ title: "Refreshed", description: "Mock data service re-sync placeholder." });
-        }}
-        onExport={() => {
-          toast({ title: "Export Snapshot", description: "UI-only placeholder action." });
-        }}
-      />
+    <>
+      <section className="space-y-4">
+        <RackVisionHeader
+          searchQuery={state.globalSearchQuery}
+          searchResults={state.globalSearchResults}
+          isSearchOpen={state.isSearchResultsOpen}
+          onSearchOpenChange={(open) => dispatch({ type: open ? "OPEN_SEARCH_RESULTS" : "CLOSE_SEARCH_RESULTS" })}
+          onSearchQueryChange={(value) => {
+            dispatch({ type: "SET_GLOBAL_SEARCH_QUERY", payload: value });
+            if (!state.isSearchResultsOpen) dispatch({ type: "OPEN_SEARCH_RESULTS" });
+            dispatch({ type: "SET_TREE_SEARCH", payload: value });
+            handleSearch(value);
+          }}
+          onSearchResultSelect={handleSearchResultSelect}
+          regionId={selectedRegionId}
+          siteId={selectedSiteId}
+          regions={regions}
+          sites={sites}
+          onRegionChange={handleRegionChange}
+          onSiteChange={handleSiteChange}
+          onRefresh={() => {
+            toast({ title: "Refreshed", description: "Mock data service re-sync placeholder." });
+          }}
+          onExport={() => {
+            toast({ title: "Export Snapshot", description: "UI-only placeholder action." });
+          }}
+        />
 
-      <RackVisionViewModeSwitcher />
-      <FilterBarPlaceholder />
-      <BreadcrumbBar onSelectBreadcrumb={handleBreadcrumbSelect} />
+        <RackVisionViewModeSwitcher />
+        <FilterBarPlaceholder />
+        <BreadcrumbBar onSelectBreadcrumb={handleBreadcrumbSelect} />
 
-      {state.isLoading ? (
-        <div className="grid gap-3 md:grid-cols-3">
-          <Skeleton className="h-[220px]" />
-          <Skeleton className="h-[220px]" />
-          <Skeleton className="h-[220px]" />
-        </div>
-      ) : (
-        <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
-          {renderCenter()}
-          <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
-        </div>
-      )}
-    </section>
+        {initialLoading ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            <Skeleton className="h-[220px]" />
+            <Skeleton className="h-[220px]" />
+            <Skeleton className="h-[220px]" />
+          </div>
+        ) : (
+          <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+            <HierarchyPanel nodes={tree} onSearch={handleSearch} onSelectEntity={handleEntitySelect} onOpenDevice={handleOpenDevice} />
+            <div className="min-h-[720px]">{renderCenter()}</div>
+            <InspectorPanel loading={inspectorLoading} summary={inspectorSummary} />
+          </div>
+        )}
+      </section>
+      <Outlet />
+    </>
   );
 }
 

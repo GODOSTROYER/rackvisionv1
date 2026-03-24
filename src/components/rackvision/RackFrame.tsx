@@ -23,7 +23,12 @@ export function RackFrame({
 }: RackFrameProps) {
   return (
     <div className="rounded-md border border-border bg-background p-1 shadow-inner">
-      <div className="grid h-[760px] grid-rows-[repeat(42,minmax(0,1fr))] rounded border border-border bg-muted/20">
+      <div
+        className="grid rounded border border-border bg-muted/20"
+        style={{
+          gridTemplateRows: "repeat(42, minmax(var(--rack-unit-height, 24px), var(--rack-unit-height, 24px)))",
+        }}
+      >
         {emptyUnits.map((unit) => (
           <RackEmptyUnit key={unit} unit={unit} visible={showEmptyUnits} />
         ))}

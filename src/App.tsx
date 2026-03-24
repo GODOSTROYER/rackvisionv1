@@ -25,42 +25,45 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<DashboardViewPage />} />
-            <Route path="dashboard/view" element={<DashboardViewPage />} />
-            <Route path="dashboard/manage" element={<DashboardManagePage />} />
-            <Route path="dashboard/rackvision" element={<RackVisionPage />} />
-            <Route path="dashboard/rackvision/region/:regionId" element={<RackVisionPage />} />
-            <Route path="dashboard/rackvision/site/:siteId" element={<RackVisionPage />} />
-            <Route path="dashboard/rackvision/rack/:rackId" element={<RackVisionPage />} />
-            <Route path="client-portal" element={<ClientPortalPage />} />
-            <Route path="systems" element={<SystemsPage />} />
-            <Route path="systems/:systemId" element={<SystemDetailsPage />} />
-            <Route path="networks" element={<NetworksPage />} />
-            <Route path="automation" element={<AutomationPage />} />
-            <Route path="reporting" element={<ReportingPage />} />
-            <Route path="advanced-reporting" element={<AdvancedReportingPage />} />
-            <Route path="integrations" element={<IntegrationsPage />} />
-            <Route path="endpoint-protection" element={<EndpointProtectionPage />} />
-            <Route path="patch-management" element={<PatchManagementPage />} />
-            <Route path="server-admin" element={<ServerAdminPage />} />
-            <Route path="configuration" element={<ConfigurationPage />} />
-            <Route path="account" element={<AccountPage />} />
-            <Route path="onboarding" element={<OnboardingPage />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<AppShell />}>
+              <Route index element={<DashboardViewPage />} />
+              <Route path="dashboard/view" element={<DashboardViewPage />} />
+              <Route path="dashboard/manage" element={<DashboardManagePage />} />
+              <Route path="dashboard/rackvision" element={<RackVisionPage />}>
+                <Route index element={null} />
+                <Route path="region/:regionId" element={null} />
+                <Route path="site/:siteId" element={null} />
+                <Route path="rack/:rackId" element={null} />
+              </Route>
+              <Route path="client-portal" element={<ClientPortalPage />} />
+              <Route path="systems" element={<SystemsPage />} />
+              <Route path="systems/:systemId" element={<SystemDetailsPage />} />
+              <Route path="networks" element={<NetworksPage />} />
+              <Route path="automation" element={<AutomationPage />} />
+              <Route path="reporting" element={<ReportingPage />} />
+              <Route path="advanced-reporting" element={<AdvancedReportingPage />} />
+              <Route path="integrations" element={<IntegrationsPage />} />
+              <Route path="endpoint-protection" element={<EndpointProtectionPage />} />
+              <Route path="patch-management" element={<PatchManagementPage />} />
+              <Route path="server-admin" element={<ServerAdminPage />} />
+              <Route path="configuration" element={<ConfigurationPage />} />
+              <Route path="account" element={<AccountPage />} />
+              <Route path="onboarding" element={<OnboardingPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
