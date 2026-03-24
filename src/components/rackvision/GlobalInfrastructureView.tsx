@@ -14,6 +14,7 @@ import { SiteOverviewCanvas } from "@/components/rackvision/SiteOverviewCanvas";
 import { GlobalSummary, GlobeMarker, RackVisionEntityKind, RegionSummary, SiteSummary } from "@/components/rackvision/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { toast } from "@/hooks/use-toast";
 import { MockDataService } from "@/services/rackvision/MockDataService";
 
 type GlobalInfrastructureViewProps = {
@@ -108,6 +109,33 @@ export function GlobalInfrastructureView({
     await loadCountryContext(countryCode);
   };
 
+  const handleMapboxUnavailable = () => {
+    setGlobeRenderer("three");
+  };
+
+  const handleOpenAlertsForScope = (scope: { markerId?: string; countryCode?: string }) => {
+    const label = scope.markerId ?? scope.countryCode ?? "global";
+    toast({
+      title: "Alerts scope queued",
+      description: `Opening alerts for ${label}.`,
+    });
+  };
+
+  const handleOpenTopSiteInCountry = async (countryCode: string) => {
+    const sitesInCountry = await MockDataService.getCountrySites(countryCode);
+    const topSite = sitesInCountry.sort((a, b) => b.summary.activeAlerts - a.summary.activeAlerts)[0];
+    if (!topSite) {
+      toast({ title: "No sites", description: `No sites available for ${countryCode}.` });
+      return;
+    }
+    await onSelectEntity(topSite.site.id);
+    onSelectMarker(topSite.site.id);
+  };
+
+  const handleOpenTopRackInSite = async (siteId: string) => {
+    await onSelectEntity(siteId);
+  };
+
   if (!forceGlobalView && selectedEntityKind && ["site", "room", "row", "rack", "device"].includes(selectedEntityKind)) {
     return (
       <SiteOverviewCanvas
@@ -180,6 +208,10 @@ export function GlobalInfrastructureView({
           onHoverMarker={onHoverMarker}
           onSelectMarker={onSelectMarker}
           onSelectCountry={handleCountrySelect}
+          onMapboxUnavailable={handleMapboxUnavailable}
+          onOpenAlertsForScope={handleOpenAlertsForScope}
+          onOpenTopSiteInCountry={handleOpenTopSiteInCountry}
+          onOpenTopRackInSite={handleOpenTopRackInSite}
           regionLookup={regionLookup}
         />
       ) : (
