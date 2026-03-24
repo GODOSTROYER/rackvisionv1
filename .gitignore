@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# local env / cache
+.localappdata/
+
+# logs / temp files
+*.err
+*.out
+.preview.*
+dev-smoke.*
