@@ -2,6 +2,13 @@
 
 RackVision is a frontend-only infrastructure-visualization module built inside a Pulseway-style admin dashboard. It provides a mock enterprise ops experience with global infrastructure mapping, site and room drill-downs, rack exploration, hierarchy search, and system-detail handoff flows.
 
+**Live demo:** <https://rackvision.vercel.app>
+
+Open the root and use the shell navigation to reach RackVision. The deployment has no SPA
+rewrite, so loading an inner path such as `/dashboard/rackvision` directly returns 404 — locally
+the Vite dev server serves those paths fine. Everything the demo shows is the local mock dataset
+described below; there is no backend behind it.
+
 ## Stack
 
 - React 18
@@ -150,4 +157,9 @@ At the time of this update, `npm audit --omit=dev` reports `0 vulnerabilities` f
 ## Repository
 
 - Remote: `https://github.com/GODOSTROYER/rackvisionv1.git`
+
+## Author
+
+Arnav Bule — [arnavbule.in](https://www.arnavbule.in) ·
+[github.com/GODOSTROYER](https://github.com/GODOSTROYER)
 
